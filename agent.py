@@ -1,5 +1,5 @@
 import numpy as np
-
+import random
 from environment import  JungleEnv
 
 class LearningBy:
@@ -28,49 +28,100 @@ class HikerAgent:
         self.policy_type = policy_type
 
     def move(self):
-        best_action = self.get_best_action()
-        #If more than 1 action is returned, we randomly choose one
-        if len(best_action) > 1:
-            best_action = "West"
+        can_move = False
+        #Let's see if we can move
+        if len(self.available_moves) > 0:
+            best_action = self.get_best_action()
+            #print("Best actions",best_action)
+
+            #If there are no available actions, then do nothing
+            if best_action is None:
+                #print("No more available moves")
+                can_move = False
+            else:
+                #print("Moving through jungle with following action",best_action)
+                reward, new_position, available_moves, topography = jungle.move(self.current_position,best_action)
+                #print("Reward", reward, "New Pos", new_position, "available_moves", available_moves, "topography", topography)
+
+                #The next step is to update the q matrix with the reward
+                q_value_old, q_max, q_value_new = self.update_q_matrix(reward,self.current_position, new_position, best_action)
+                #print("q_value_old",q_value_old,"q_max",q_max,"q_value_new",q_value_new)
+                #Update the agent's state and available moves
+                self.current_position = new_position
+                self.available_moves = available_moves
+
+                if topography == self.environment.goal_state:
+                    #We've reached the goal so there are no more moves:
+                    #print("Reached goal state")
+                    can_move = False
+                else:
+                    can_move = True
         else:
-            best_action = "West"
-
-        reward, new_position, available_moves, topography = jungle.move(self.current_position,best_action)
-
-        #The next step is to update the q matrix with the reward
-        self.update_q_matrix(reward,self.current_position, new_position, best_action)
-
-        #Update the agent's state and available moves
-        self.current_position = new_position
-        self.available_moves = available_moves
-        return
+            #print("No more moves")
+            can_move = False
+        return can_move
 
     def initialise_q_matrix(self):
         self.q_matrix = np.full(self.environment.reward_matrix.shape, 0)
 
+    def get_q_value(self,state,action_index):
+        return self.q_matrix[self.environment.get_r_index((state[0],state[1])), action_index]
+
     def update_q_matrix(self, reward, state, new_state, action):
-        #We will update the Q value for ther given state and action
+        #We will update the Q value for the given state and action
         #The state defines the position at which the action was taken
         #Get the index into the Q matrix
         shape = self.environment.reward_matrix.shape
         row, col = state[0],state[1]
-        action = self.environment.all_actions[action]
-        #Get the old q_value
-        q_value_old = 0
-        #For the new_state, get the action that has the best estimated q value
-        q_max = 1
+        action_index = self.environment.all_actions[action]
+        #Get the old q_value which is found in the q matrix for state,action
+        q_value_old = self.get_q_value(state,action_index)
+        #For the new_state, get the action that has the best estimated q value for the new_state
+        new_state_index = self.environment.get_r_index((new_state[0],new_state[1]))
+        q_max = max(self.q_matrix[new_state_index])
         #Update the old q value
-        q_value_old = q_value_old + self.alpha * ( reward+(self.gamma*q_max) - q_value_old )
+        q_value_new = q_value_old + self.alpha * ( reward+(self.gamma*q_max) - q_value_old )
 
-        self.q_matrix[self.environment.get_r_index((row,col)), action] = q_value_old
-        return
+        self.q_matrix[self.environment.get_r_index((row,col)), action_index] = q_value_new
+        return q_value_old, q_max, q_value_new
 
     def get_best_action(self):
-        #Create a list of available moves column indices
-        moves = [x for x in self.available_moves.values()]
-        #Look into the q matrix and get the action with the largest q values
-        best_action = self.q_matrix[:,moves].max(1)
+        #Create a list of available moves from the curent state
+        moves = np.array([x for x in self.available_moves.values()])
+
+        #If there are no available moves then the best action is none
+        if len(moves) == 0:
+            best_action = None
+        else:
+            #Look into the q matrix and get the action from the current state with the largest q values
+            r_index = self.environment.get_r_index(self.current_position)
+            # Let's select the move with the highest expected q_max
+            q_max = self.q_matrix[r_index, moves].max()
+            # Let's get all the available actions that have this q_max. Important to note
+            # that flatnonzero will return more indices into moves
+            best_action_values = moves[np.flatnonzero(self.q_matrix[r_index, moves] == q_max)]
+            best_actions = [i[0] for i in list(self.environment.all_actions.items()) if i[1] in best_action_values]
+            #Let's look at our learning policy
+            if self.policy_type == 'Greedy':
+                #Randomly choose best action. If there is only one, the code below will select it
+                #best_action = best_actions[random.randint(0,len(best_actions)-1)]
+                best_action = np.random.choice(best_actions)
+            else:
+                #We are using Epsilon-greedy
+                #ref: INM707 Lab 4
+                if np.random.uniform() > self.epsilon:
+                    action_value = np.random.choice(moves)
+                    best_action = [i[0] for i in list(self.environment.all_actions.items()) if i[1] == action_value][0]
+                    # print("Selecting random action '{}' with current Q value {}".format(A[a], Q[s,a]))
+                else:
+                    best_action = np.random.choice(best_actions)
+                    # print("Selecting greedy action '{}' with current Q value {}".format(A[a], Q[s,a]))
+
         return best_action
+
+    def random_start(self):
+        self.current_position = self.environment.get_start_position()
+        self.available_moves = jungle.get_available_moves(self.current_position)
 
 jungle = JungleEnv(7, 7)
 jungle.add_mountains([(1, 5), (2, 5), (3, 5)])
@@ -80,13 +131,23 @@ jungle.add_rivers([(4, 4)])
 jungle.add_lakes([(5, 4)])
 jungle.add_exits([(4, 7), [5, 7]])
 jungle.fill_r_matrix()
-hiker = HikerAgent((1,1),0.9,1,1,'Greedy',jungle)
-print(jungle.jungle_floor)
-print(hiker.q_matrix)
+hiker = HikerAgent((1,1),0,1.0,1.0,'Epsilon-Greedy',jungle,"Q-Learning")
 #print(jungle.jungle_floor)
-#print(jungle.reward_matrix)
-#print(jungle.move((4, 4), "West"))
-#print(jungle.move((4, 4), "East"))
-# print(jungle.get_available_moves((3,4)))
+#reward, new_position, available_moves, topography = jungle.move((4, 4), "West")
+
+#We go through 1000 episodes
+#ref: INM707 Lab4
+for episode in range(1000):
+    #For each episode we go through 500 timesteps
+    for timestep in range(500):
+        hiker.random_start()
+        while hiker.move():
+            continue
+    print('Episode {} finished. Q matrix values:\n{}'.format(episode, hiker.q_matrix.round(1)))
+print('Final Q matrix: \n{}'.format(hiker.q_matrix.round(0)))
+
+
+
+
 
 

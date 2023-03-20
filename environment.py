@@ -1,10 +1,12 @@
+import random
+
 import numpy
 import numpy as np
 
 
 class JungleEnv:
 
-    def __init__(self, rows, cols):
+    def __init__(self, rows, cols, rewards = None,goal_state=None):
         self.rows = rows
         self.cols = cols
         self.exit_reward = 500
@@ -15,6 +17,11 @@ class JungleEnv:
         self.lakes = []
         self.exits = []
         self.all_actions = {"North":0,"South":1,"East":2,"West":3}
+        if goal_state is None:
+            self.goal_state = "E"
+        else:
+            self.goal_state = goal_state
+
         #Let's add the rewards. They're as follows:
         #F: Jungle floor that takes 1 day to cross and you lose 1 point
         #R: River that will cut the journey by 5 days so you gain 5 points
@@ -22,7 +29,10 @@ class JungleEnv:
         #L: Lake that takes 2 days to cross so you lose 2 points
         #S: Sinkhole that ends the game so you lose 1000 points
         #E: Exit that gives you 500 points so you gain 500 points
-        self.rewards = {"F":-1,"R":5,"T":-70,"L":-2,"M":-5,"S":-1000,"E":500}
+        if rewards is None:
+            self.rewards = {"F":-1,"R":5,"T":-70,"L":-2,"M":-5,"S":-1000,"E":500}
+        else:
+            self.rewards = rewards
         self.jungle_floor = np.full([rows,cols,],'F')
         #Our reward matrix consists of s rows and a columns where
         #s: rows*cols which is the number of states. A state corresponds to the position on the jungle floow
@@ -98,9 +108,9 @@ class JungleEnv:
         new_position = ()
 
         if in_direction == "North":
-            new_position = (from_position[0]+1,from_position[1])
+            new_position = (from_position[0]-1,from_position[1])
         elif in_direction == "South":
-            new_position = (from_position[0]-1, from_position[1])
+            new_position = (from_position[0]+1, from_position[1])
         elif in_direction == "East":
             new_position = (from_position[0], from_position[1]+1)
         else:
@@ -116,55 +126,58 @@ class JungleEnv:
 
     def get_available_moves(self,position):
         #Get the list of available moves from the position
-        moves = {"North":0, "South": 1, "East":2, "West":3}
+        moves = self.all_actions.copy()
         forbidden_moves = []
 
         #If we're in a sinkhole then we cannot move
         if self.jungle_floor[position[0]-1,position[1]-1]=="S":
             moves.clear()
-            return moves
+        else:
+            #Check if on a boundary
+            if(position[1] == 1):
+                #We're at the west border so cannot move west
+                moves.pop("West")
+            if(position[1] == self.cols):
+                #We're at the eastern border so cannot move east
+                moves.pop("East")
+            if(position[0] == 1):
+                #We're at the northern border so cannot move north
+                moves.pop("North")
+            if(position[0] == self.rows):
+                #We're at the southern border so cannot move south
+                moves.pop("South")
 
-        #Check if on a boundary
-        if(position[1] == 1):
-            #We're at the west border so cannot move west
-            moves.pop("West")
-        if(position[1] == self.cols):
-            #We're at the eastern border so cannot move east
-            moves.pop("East")
-        if(position[0] == 1):
-            #We're at the northern border so cannot move north
-            moves.pop("North")
-        if(position[0] == self.rows):
-            #We're at the southern border so cannot move south
-            moves.pop("South")
+            #If we're on a mountain we cannot move to any adjacent cell that contains another mountain
+            if self.jungle_floor[position[0] - 1, position[1] - 1] == "M":
+                #We're on a mountain. If any of the available moves leads to a mountain, remove it
+                for move in moves.keys():
+                    if move =="North":
+                        #Check the north adjacent
+                        if self.jungle_floor[position[0] - 1 - 1, position[1] - 1] == "M":
+                            forbidden_moves.append("North")
+                    elif move =="South":
+                        # Check the south adjacent
+                        if self.jungle_floor[position[0] - 1+1, position[1] - 1] == "M":
+                            forbidden_moves.append("South")
+                    elif move =="East":
+                        # Check the east adjacent
+                        if self.jungle_floor[position[0] - 1, position[1] - 1+1] == "M":
+                            forbidden_moves.append("East")
+                    else:
+                        # Check the west adjacent
+                        if self.jungle_floor[position[0] - 1, position[1] - 1-1] == "M":
+                            forbidden_moves.append("West")
 
-        #If we're on a mountain we cannot move to any adjacent cell that contains another mountain
-        if self.jungle_floor[position[0] - 1, position[1] - 1] == "M":
-            #We're on a mountain. If any of the available moves leads to a mountain, remove it
-            for move in moves.keys():
-                if move =="North":
-                    #Check the north adjacent
-                    if self.jungle_floor[position[0] - 1 - 1, position[1] - 1] == "M":
-                        forbidden_moves.append("North")
-                elif move =="South":
-                    # Check the south adjacent
-                    if self.jungle_floor[position[0] - 1+1, position[1] - 1] == "M":
-                        forbidden_moves.append("South")
-                elif move =="East":
-                    # Check the east adjacent
-                    if self.jungle_floor[position[0] - 1, position[1] - 1+1] == "M":
-                        forbidden_moves.append("East")
-                else:
-                    # Check the west adjacent
-                    if self.jungle_floor[position[0] - 1, position[1] - 1-1] == "M":
-                        forbidden_moves.append("West")
-
-        for move in forbidden_moves:
-            moves.pop(move)
+            for move in forbidden_moves:
+                moves.pop(move)
 
         return moves
 
-
+    def get_start_position(self):
+        #Randomly choose a start position
+        row = random.randint(1,self.rows)
+        col = random.randint(1,self.cols)
+        return [row,col]
 
 jungle = JungleEnv(7,7)
 jungle.add_mountains([(1,5),(2,5),(3,5)])
@@ -174,8 +187,3 @@ jungle.add_rivers([(4,4)])
 jungle.add_lakes([(5,4)])
 jungle.add_exits([(4,7),[5,7]])
 jungle.fill_r_matrix()
-print(jungle.jungle_floor)
-print(jungle.reward_matrix)
-print(jungle.move((4,4),"West"))
-print(jungle.move((4,4),"East"))
-#print(jungle.get_available_moves((3,4)))
