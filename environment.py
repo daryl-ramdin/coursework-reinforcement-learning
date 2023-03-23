@@ -77,7 +77,7 @@ class JungleEnv:
         for row in range(1,self.rows+1):
             for col in range(1,self.cols+1):
                 #Get the list of available moves and get the reward based on that move
-                print((row,col))
+                #print((row,col))
                 moves = self.get_available_moves((row,col))
                 for move in moves:
                     if move=="North":
@@ -179,11 +179,19 @@ class JungleEnv:
         col = random.randint(1,self.cols)
         return [row,col]
 
-jungle = JungleEnv(7,7)
-jungle.add_mountains([(1,5),(2,5),(3,5)])
-jungle.add_sinkholes([(1,4),(3,4),(6,2),(7,4)])
-jungle.add_tigers([(4,5)])
-jungle.add_rivers([(4,4)])
-jungle.add_lakes([(5,4)])
-jungle.add_exits([(4,7),[5,7]])
-jungle.fill_r_matrix()
+    def get_new_index(self, index, move):
+        new_index = 0
+        if move == 0:
+            new_index = index-self.rows
+        elif move ==1:
+            new_index = index+self.rows
+        elif move == 2:
+            new_index = index+1
+        else:
+            new_index = index-1
+        return new_index
+
+    def get_position(self,index):
+        #The position is given by index/rows,remainder
+        return [(index//self.rows)+1,(index%self.rows)+1]
+

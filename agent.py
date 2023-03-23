@@ -1,5 +1,6 @@
 import numpy as np
 import random
+from matplotlib import pyplot as plt
 from environment import  JungleEnv
 
 class LearningBy:
@@ -110,10 +111,12 @@ class HikerAgent:
                 #We are using Epsilon-greedy
                 #ref: INM707 Lab 4
                 if np.random.uniform() > self.epsilon:
+                    #We randomly choose a move from the available moves
                     action_value = np.random.choice(moves)
                     best_action = [i[0] for i in list(self.environment.all_actions.items()) if i[1] == action_value][0]
                     # print("Selecting random action '{}' with current Q value {}".format(A[a], Q[s,a]))
                 else:
+                    #We choose the available move that has the highest estimated reward
                     best_action = np.random.choice(best_actions)
                     # print("Selecting greedy action '{}' with current Q value {}".format(A[a], Q[s,a]))
 
@@ -123,6 +126,24 @@ class HikerAgent:
         self.current_position = self.environment.get_start_position()
         self.available_moves = jungle.get_available_moves(self.current_position)
 
+    def get_current_topography(self):
+        return self.environment.get_topography(self.current_position)
+
+    def show_path(self,position):
+        #Convert the position to an index in the q_matrix
+        index = self.environment.get_r_index(position)
+        print("Start",position, self.environment.get_topography(position))
+        #Given the index let's get the action with the best reward
+
+        while 1:
+            next_move = self.q_matrix[index].argmax()
+            index = self.environment.get_new_index(index,next_move)
+            position = self.environment.get_position(index)
+            topography = self.environment.get_topography(position)
+            print("Move to:",position,topography)
+            if topography in ["S","E"]: break
+
+
 jungle = JungleEnv(7, 7)
 jungle.add_mountains([(1, 5), (2, 5), (3, 5)])
 jungle.add_sinkholes([(1, 4), (3, 4), (6, 2), (7, 4)])
@@ -131,20 +152,49 @@ jungle.add_rivers([(4, 4)])
 jungle.add_lakes([(5, 4)])
 jungle.add_exits([(4, 7), [5, 7]])
 jungle.fill_r_matrix()
-hiker = HikerAgent((1,1),0,1.0,1.0,'Epsilon-Greedy',jungle,"Q-Learning")
-#print(jungle.jungle_floor)
+epsilon = 0
+alpha = 1.0
+gamma = 1.0
+
+hiker = HikerAgent((1,1),0.8,1.0,1.0,'Epsilon-Greedy',jungle,"Q-Learning")
+print(jungle.jungle_floor)
 #reward, new_position, available_moves, topography = jungle.move((4, 4), "West")
 
 #We go through 1000 episodes
 #ref: INM707 Lab4
-for episode in range(1000):
+metrics = {"E":[],"S":[],"F":[]}
+episodes = 10000
+timesteps = 5000
+
+for episode in range(episodes):
     #For each episode we go through 500 timesteps
-    for timestep in range(500):
-        hiker.random_start()
-        while hiker.move():
-            continue
-    print('Episode {} finished. Q matrix values:\n{}'.format(episode, hiker.q_matrix.round(1)))
+    hiker.random_start()
+    last_timestep = 0
+    for timestep in range(timesteps):
+        if not hiker.move(): break
+        last_timestep+=1
+
+    #Let's see what state the hiker ended up in
+    topography = hiker.get_current_topography()
+    metrics[topography].append([episode,last_timestep])
+    if episode == 5000: hiker.epsilon = 0.9
+
+    #print('Episode {} finished. Q matrix values:\n{}'.format(episode, hiker.q_matrix.round(1)))
 print('Final Q matrix: \n{}'.format(hiker.q_matrix.round(0)))
+
+#Let's plot a graph of the number of timesteps per epoch to reach the exit
+fig, ax = plt.subplots(3)
+i = 0
+for key in metrics.keys():
+    vals = np.array(metrics[key])
+    if len(vals) > 0:
+        ax[i].plot(vals[:,[0]],vals[:,[1]])
+        ax[i].set_title(key)
+    i+=1
+
+plt.show()
+hiker.show_path([1,1])
+
 
 
 
