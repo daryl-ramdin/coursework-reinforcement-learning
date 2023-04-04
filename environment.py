@@ -35,7 +35,7 @@ class JungleEnv:
         #S: Sinkhole that ends the game so you lose 1000 points
         #E: Exit that gives you 500 points so you gain 500 points
         if rewards is None:
-            self.rewards = {"F":-1,"R":-5,"B":-70,"L":-2,"M":-5,"S":-100,"T":500,"E":200}
+            self.rewards = {"F":-1,"R":-5,"B":-70,"L":-2,"M":-5,"S":-100,"T":0,"E":200}
         else:
             self.rewards = rewards
         self.jungle_floor = np.full([rows,cols,],'F')
