@@ -9,7 +9,6 @@ class JungleEnv:
     def __init__(self, rows, cols, rewards = None,goal_state=None,can_revisit=True,vanishing_treasure=False,seed=45):
         self.rows = rows
         self.cols = cols
-        self.exit_reward = 500
         self.mountains = []
         self.bears = []
         self.treasure = []
@@ -35,7 +34,7 @@ class JungleEnv:
         #S: Sinkhole that ends the game so you lose 1000 points
         #E: Exit that gives you 500 points so you gain 500 points
         if rewards is None:
-            self.rewards = {"F":-1,"R":-5,"B":-70,"L":-2,"M":-5,"S":-100,"T":0,"E":200}
+            self.rewards = {"F":-1,"R":-5,"B":-70,"L":-2,"M":-5,"S":-100,"T":10,"E":100}
         else:
             self.rewards = rewards
         self.jungle_floor = np.full([rows,cols,],'F')
