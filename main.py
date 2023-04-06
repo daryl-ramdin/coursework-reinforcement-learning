@@ -1,6 +1,6 @@
 from matplotlib import pyplot as plt
-from environment import  JungleEnv
-from agent import HikerAgent
+from jungle import  JungleEnv
+from hiker import HikerAgent
 import numpy as np
 
 

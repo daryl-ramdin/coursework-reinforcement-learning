@@ -1,7 +1,7 @@
 import numpy as np
 import random
 from matplotlib import pyplot as plt
-from environment import  JungleEnv
+from jungle import  JungleEnv
 
 class LearningBy:
     def __init__(self,learning_algorithm):
