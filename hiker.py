@@ -1,7 +1,7 @@
 import numpy as np
 import random
 from matplotlib import pyplot as plt
-from jungle import  JungleEnv
+from jungle import  Jungle
 
 class LearningBy:
     def __init__(self,learning_algorithm):
@@ -17,7 +17,7 @@ class LearningBy:
 
 
 class HikerAgent:
-    def __init__(self,start_position, epsilon, alpha, gamma, policy_type, jungle: JungleEnv, learning_algorithm, seed=45):
+    def __init__(self,start_position, epsilon, alpha, gamma, policy_type, jungle: Jungle, learning_algorithm, seed=45):
         self.environment = jungle
         self.initialise_q_matrix()
         self.current_position = start_position
@@ -40,27 +40,25 @@ class HikerAgent:
 
             #If there are no available actions, then do nothing
             if next_action is None:
-                #print("No more available moves")
                 can_move = False
             else:
                 #print("Moving through jungle with following action",best_action)
-                reward, new_position, available_moves, topography = self.environment.move(self.current_position,next_action)
-                #print("Reward", reward, "New Pos", new_position, "available_moves", available_moves, "topography", topography)
-                #Update the cumulative reward
-                self.cumulative_reward+=reward
-                #The next step is to update the q matrix with the reward
-                q_value_old, q_max, q_value_new = self.update_q_matrix(reward,self.current_position, new_position, next_action)
-                #print("q_value_old",q_value_old,"q_max",q_max,"q_value_new",q_value_new)
-                #Update the agent's state and available moves
-                self.current_position = new_position
-                self.available_moves = available_moves
+                reward, new_position, available_moves, terminated, topography = self.environment.move(next_action)
 
-                if topography == self.environment.goal_state:
-                    #We've reached the goal so there are no more moves:
-                    #print("Reached goal state")
+                #If new_position is none then it means we cannot move
+                if new_position is None:
                     can_move = False
                 else:
-                    can_move = True
+                    #Update the cumulative reward
+                    self.cumulative_reward+=reward
+                    #The next step is to update the q matrix with the reward
+                    q_value_old, q_max, q_value_new = self.update_q_matrix(reward,self.current_position, new_position, next_action)
+                    #Update the agent's state and available moves
+                    self.current_position = new_position
+                    self.available_moves = available_moves
+
+                    #Check to see if we can move. If the terminated state is True, then we cannot move
+                    can_move = not terminated
         else:
             #print("No more moves")
             can_move = False
@@ -129,8 +127,7 @@ class HikerAgent:
 
     def random_start(self):
         self.cumulative_reward = 0
-        #self.epsilon = self.initial_epsilon
-        self.current_position = self.environment.get_start_position()
+        self.current_position = self.environment.reset()
         self.available_moves = self.environment.get_available_moves(self.current_position)
 
     def get_current_topography(self):

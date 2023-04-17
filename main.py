@@ -1,5 +1,5 @@
 from matplotlib import pyplot as plt
-from jungle import  JungleEnv
+from jungle import  Jungle
 from hiker import HikerAgent
 import numpy as np
 
@@ -9,7 +9,7 @@ import numpy as np
 #Let's setup the environment
 
 '''
-jungle = JungleEnv(rows=7,cols=4,vanishing_treasure=True)
+jungle = Jungle(rows=7,cols=4,vanishing_treasure=True)
 jungle.add_mountains([(1, 3), (2, 3)])
 jungle.add_sinkholes([(7, 3)])
 jungle.add_bears([(4, 3)])
@@ -18,14 +18,14 @@ jungle.add_lakes([(4, 1)])
 jungle.add_exits([(4, 4), (7, 4)])
 jungle.add_treasure([(7,1)])
 '''
-jungle = JungleEnv(rows=5,cols=4,vanishing_treasure=False)
+jungle = Jungle(rows=5,cols=4,vanishing_treasure=False)
 jungle.add_mountains([(1, 3)])
 jungle.add_sinkholes([(2, 2)])
 jungle.add_bears([(4, 3)])
 jungle.add_rivers([(5, 2)])
 jungle.add_lakes([(4, 1)])
 jungle.add_exits([(4, 4), (5, 4)])
-jungle.add_treasure([(1,4)])
+jungle.add_tiger([(1,4)])
 jungle.fill_r_matrix()
 
 #Set Q Learning parameters
@@ -43,7 +43,7 @@ tracker = {"last_episode":0,"trend":[]}
 metrics = {"E":1,"S":2,"CR":3,"Occurrence":4}
 logger = {"E":{"last_episode":0,"trend":[]},
           "S":{"last_episode":0,"trend":[]},
-          "F":{"last_episode":0,"trend":[]},
+          "_":{"last_episode":0,"trend":[]},
           "R":{"last_episode":0,"trend":[]},
           "T":{"last_episode":0,"trend":[]},
           "M":{"last_episode":0,"trend":[]},
