@@ -49,7 +49,6 @@ class DQN(nn.Module):
         '''
         return output
 
-
 class ReplayBuffer:
     def __init__(self,buffer_size,batch_size):
         #ref: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
@@ -68,7 +67,6 @@ class ReplayBuffer:
     def __getitem__(self, item=None):
         return random.sample(self.buffer,self.batch_size)
 
-
 def get_next_action(state):
     #The state is a Dict {"jungle_position":np.array[row,col]}
     state = torch.tensor(state["jungle_position"],device=device,dtype=torch.float)
@@ -77,7 +75,7 @@ def get_next_action(state):
 
     if np.random.uniform() > EPSILON:
         #We use the best
-        next_action = Q_network(state).argmax()
+        next_action = O_network(state).argmax()
     else:
         #We explore
         next_action = torch.tensor(env.action_space.sample(),device=device,dtype=torch.int64)
@@ -107,10 +105,10 @@ config = [{"in":sizeof_obs,"out":256},
           {"in":256,"out":256},
           {"in":256,"out":sizeof_actn}]
 
-Q_network = DQN(config).to(device)
+O_network = DQN(config).to(device)
 T_network = DQN(config).to(device)
-T_network.load_state_dict(Q_network.state_dict())
-optimizer = optim.AdamW(Q_network.parameters(),lr=1e-05)
+T_network.load_state_dict(O_network.state_dict())
+optimizer = optim.AdamW(O_network.parameters(),lr=1e-05)
 
 #Let's get the observation. ref: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 replay_buffer = ReplayBuffer(50,5)
@@ -125,7 +123,7 @@ for i in range(episode_count):
     go = True
     episode_reward = 0
     while go:
-
+        
         #Get the action
         action = get_next_action(state)
 
@@ -137,40 +135,60 @@ for i in range(episode_count):
         episode_reward+=reward
         next_state = observation
 
+        #Get the states to put in the buffer
+        pstate = state["jungle_position"].tolist()
+        pnstate = next_state["jungle_position"].tolist()
+
         #INM 707 Lab 8
         go = not terminated
         if terminated:
-            next_state = None
+            pnstate = None
 
         #Store the transition
-        replay_buffer.push(state, sel_act, next_state, reward)
+        replay_buffer.push(pstate, sel_act, pnstate, reward)
 
         #Let our model train on a batch of transitions
         if len(replay_buffer) > replay_buffer.batch_size:
             batch = next(iter(replay_buffer))
-            #We now have a batch of transitions on which we will train our
-            #Q_network. Get the states from the batch and get the best
-            #predicted action
-            for trn in batch:
-                state_action_value = Q_network(torch.tensor(trn.state["jungle_position"],device=device,dtype=torch.float))
-                #If the transitions next_state is non final, we use our target network to get
-                #its value
-                if trn.next_state is not None:
-                    with torch.no_grad():
-                        next_state_action = T_network(torch.tensor(trn.next_state["jungle_position"],device=device,dtype=torch.float))
-                    #Let's calculate the expected Q value
-                    expected_state_action_values = (next_state_action * GAMMA) + trn.reward
-                    criterion = nn.SmoothL1Loss()
-                    loss = F.mse_loss(state_action_value,expected_state_action_values)
-                    #loss =  criterion(state_action_value.unsqueeze(0).unsqueeze(1),expected_state_action_values.unsqueeze(0).unsqueeze(1))
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
+            #We now have a batch of transitions on which we will train our networks
+            i = 1
+            #Let's start extracting from the batch of transitions
+            states = torch.tensor([trn.state for trn in batch],device=device,dtype=torch.float)
+            non_termination_next_states = torch.tensor([trn.next_state for trn in batch if trn.next_state is not None],device=device,dtype=torch.float)
+            actions = torch.tensor([trn.action for trn in batch],device=device,dtype=torch.int64)
+            rewards = torch.tensor([trn.reward for trn in batch],device=device)
+
+            # Get the states from the batch and get the state action values
+            state_action_values = O_network(states).gather(1, actions.unsqueeze(1))
+
+            #The next step is to get the next state action values from the target network
+            #Some of our next states are final states and we do not calculate action values for them
+            #We must create a mask to block them out
+            non_terminating_mask = [trn.next_state is not None for trn in batch]
+
+            if (len(non_terminating_mask)) < len(batch):
+                print("Found onee")
+
+            next_state_action_value = torch.zeros(len(batch),device=device)
+
+            results= T_network(non_termination_next_states)
+            next_state_action_value[non_terminating_mask] = results.max(1)[0]
+            #Calculate the expected state action values
+            expected_state_action_values = (next_state_action_value * GAMMA) + rewards
+            criterion = nn.SmoothL1Loss()
+
+            loss = F.mse_loss(state_action_values.squeeze(1), expected_state_action_values)
+            # loss =  criterion(state_action_value.unsqueeze(0).unsqueeze(1),expected_state_action_values.unsqueeze(0).unsqueeze(1))
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+
         state = next_state
 
     print("episode_reward",episode_reward)
     #Update the weights for the target network after every episode
-    T_network.load_state_dict(Q_network.state_dict())
+    T_network.load_state_dict(O_network.state_dict())
 
 
 
