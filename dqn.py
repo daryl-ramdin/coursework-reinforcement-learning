@@ -29,16 +29,30 @@ class LossFunction():
 
 class DQN(nn.Module):
     #This is the DQN class
-    def __init__(self, configuration=""):
+    def __init__(self, sizeof_obs_space=2, sizeof_act_space=4):
         #ref: INM 707 Lab 8 Feedback
         super().__init__()
         '''
         :param configuration: [{in:int, out:int}]
         '''
-        self.fc1 = nn.Linear(2,256)
+        self.sizeof_obs_space = sizeof_obs_space
+        self.sizeof_act_space = sizeof_act_space
+
+        self.seq = nn.Sequential(
+            nn.Linear(self.sizeof_obs_space, self.sizeof_hidden),
+            nn.ReLU(),
+            nn.Linear(self.sizeof_obs_space, self.sizeof_hidden),
+            nn.ReLU(),
+            nn.Linear(self.sizeof_obs_space, self.sizeof_hidden),
+            nn.ReLU(),
+            nn.Linear(self.sizeof_hidden, self.sizeof_act_space)
+        )
+        '''
+        self.fc1 = nn.Linear(self.sizeof_obs_space,256)
         self.fc2 = nn.Linear(256,256)
         self.fc3 = nn.Linear(256, 256)
-        self.fc4 = nn.Linear(256, 4)
+        self.fc4 = nn.Linear(256, self.sizeof_act_space)
+        '''
         '''
         self.layers = []
         for layer in configuration:
@@ -47,10 +61,12 @@ class DQN(nn.Module):
 
     def forward(self,input):
         #Run the forward pass. ref: INM707 Lab 8
+        '''
         input = F.relu(self.fc1(input))
         input = F.relu(self.fc2(input))
         input = F.relu(self.fc3(input))
         output = self.fc4(input)
+        '''
         '''
         i = 0
         for i in range(len(self.layers)-1):
@@ -58,7 +74,48 @@ class DQN(nn.Module):
         #return the output
         output = self.layers[i+1](input)
         '''
+        output = self.seq(input)
         return output
+
+class DuellingDQN(nn):
+    #ref: https://towardsdatascience.com/how-to-implement-prioritized-experience-replay-for-a-deep-q-network-a710beecd77b
+    def __init__(self,sizeof_obs_space=2, sizeof_act_space=4):
+        super().__init__()
+        self.sizeof_obs_space = sizeof_obs_space
+        self.sizeof_act_space = sizeof_act_space
+        self.sizeof_hidden = 256
+        self.mode = "mean"
+
+        #Our DQN contains two additional layers, one for the value and the other the advantage
+        #ref: https://arxiv.org/pdf/1511.06581.pdf
+        self.common_stream = nn.Sequential(
+            nn.Linear(self.sizeof_obs_space,self.sizeof_hidden),
+            nn.ReLU(),
+            nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
+            nn.ReLU()
+        )
+
+        self.value_stream = nn.Sequential(
+            nn.Linear(self.sizeof_hidden,self.sizeof_hidden),
+            nn.ReLU(),
+            nn.Linear(self.sizeof_hidden, 1)
+        )
+
+        self.advantage_stream = nn.Sequential(
+            nn.Linear(self.sizeof_hidden,self.sizeof_hidden),
+            nn.ReLU(),
+            nn.Linear(self.sizeof_hidden, self.sizeof_act_space)
+        )
+
+    def forward(self, input):
+        # Run the forward pass. ref: INM707 Lab 8
+        common_value = self.common_stream(input)
+        state_value = self.value_stream(common_value)
+        advantage = self.advantage_stream(common_value)
+
+        q_value = state_value + (advantage - advantage.mean())
+
+        return q_value
 
 class ReplayBuffer:
     def __init__(self,buffer_size,batch_size):
@@ -98,16 +155,22 @@ class DQNAgent():
 
 class ClassicDQNAgent(DQNAgent):
 
-    def __init__(self, env, epsilon=0.5, gamma=0.99, epsilon_decay=1e-06,buffer_size=50, batch_size = 5, optimizer=None, loss_type ="MSE", device=None):
+    def __init__(self, env, epsilon=0.5, gamma=0.99, epsilon_decay=1e-06,buffer_size=50, batch_size = 5, loss_type ="MSE", device=None,
+                 **kwargs):
         super().__init__(env, epsilon, gamma, epsilon_decay, buffer_size, batch_size, loss_type, device)
 
         self.P_network = DQN()
         self.T_network = DQN()
-
-        if optimizer is None:
-            self.optimizer = optim.AdamW(self.P_network.parameters(), lr=1e-05)
-        else:
-            self.optimizer = optimizer
+        '''
+        if "typeof_dqn" in kwargs:
+            if kwargs["typeof_dqn"] == "DQN":
+                self.P_network = DQN()
+                self.T_network = DQN()
+            else:
+                self.P_network = DuellingDQN(kwargs["duelling_mode"])
+                self.T_network = DuellingDQN(kwargs["duelling_mode"])
+        '''
+        self.optimizer = optim.AdamW(self.P_network.parameters(), lr=1e-05)
 
         self.T_network.load_state_dict(self.P_network.state_dict())
 
@@ -230,11 +293,10 @@ class ClassicDQNAgent(DQNAgent):
         print("Learning complete")
         return episode_logger
 
-
 class DoubleDQNAgent(ClassicDQNAgent):
     #ref: https://www.datahubbs.com/double-deep-q-learning-to-get-the-most-out-of-your-dqn/
-    def __init__(self, env, epsilon=0.5, gamma=0.99, epsilon_decay=1e-06,buffer_size=50, batch_size = 5, optimizer=None, loss_type ="MSE", device=None):
-        super().__init__(env, epsilon, gamma, epsilon_decay, buffer_size, batch_size, optimizer, loss_type, device)
+    def __init__(self, env, epsilon=0.5, gamma=0.99, epsilon_decay=1e-06,buffer_size=50, batch_size = 5, loss_type ="MSE", device=None,**kwargs):
+        super().__init__(env, epsilon, gamma, epsilon_decay, buffer_size, batch_size, loss_type, device)
 
     def learn_policy(self, episode_count=100):
 
@@ -325,7 +387,6 @@ class DoubleDQNAgent(ClassicDQNAgent):
             self.T_network.load_state_dict(self.P_network.state_dict())
         print("Learning complete")
         return episode_logger
-
 
 
 
