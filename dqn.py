@@ -17,19 +17,21 @@ GAMMA = 0.99
 Transition = namedtuple("Transition",("state", "action", "next_state", "reward"))
 
 class LossFunction():
+    SmoothL1= "SmoothL1"
+    MSE = "MSE"
     def __init__(self,loss_type):
         self.loss_type = loss_type
     def calculate(self,input,target):
         loss = None
-        if self.loss_type=="MSE":
+        if self.loss_type==LossFunction.MSE:
             loss = F.mse_loss(input,target)
-        elif self.loss_type=="SmoothL1":
+        elif self.loss_type==LossFunction.SmoothL1:
             loss = F.smooth_l1_loss(input,target)
         return loss
 
 class DQN(nn.Module):
     #This is the DQN class
-    def __init__(self, sizeof_obs_space=2, sizeof_act_space=4):
+    def __init__(self, sizeof_obs_space=2, sizeof_act_space=4,sizeof_hidden=254):
         #ref: INM 707 Lab 8 Feedback
         super().__init__()
         '''
@@ -37,13 +39,14 @@ class DQN(nn.Module):
         '''
         self.sizeof_obs_space = sizeof_obs_space
         self.sizeof_act_space = sizeof_act_space
+        self.sizeof_hidden = sizeof_hidden
 
         self.seq = nn.Sequential(
             nn.Linear(self.sizeof_obs_space, self.sizeof_hidden),
             nn.ReLU(),
-            nn.Linear(self.sizeof_obs_space, self.sizeof_hidden),
+            nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
             nn.ReLU(),
-            nn.Linear(self.sizeof_obs_space, self.sizeof_hidden),
+            nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
             nn.ReLU(),
             nn.Linear(self.sizeof_hidden, self.sizeof_act_space)
         )
@@ -77,9 +80,10 @@ class DQN(nn.Module):
         output = self.seq(input)
         return output
 
-class DuellingDQN(nn):
+
+class DuellingDQN(nn.Module):
     #ref: https://towardsdatascience.com/how-to-implement-prioritized-experience-replay-for-a-deep-q-network-a710beecd77b
-    def __init__(self,sizeof_obs_space=2, sizeof_act_space=4):
+    def __init__(self,sizeof_obs_space=2, sizeof_act_space=4,sizeof_hidden=256):
         super().__init__()
         self.sizeof_obs_space = sizeof_obs_space
         self.sizeof_act_space = sizeof_act_space
@@ -155,21 +159,18 @@ class DQNAgent():
 
 class ClassicDQNAgent(DQNAgent):
 
-    def __init__(self, env, epsilon=0.5, gamma=0.99, epsilon_decay=1e-06,buffer_size=50, batch_size = 5, loss_type ="MSE", device=None,
+    def __init__(self, env, epsilon=0.9, gamma=0.99, epsilon_decay=0.99,buffer_size=50, batch_size = 5, loss_type ="MSE", device=None,
                  **kwargs):
         super().__init__(env, epsilon, gamma, epsilon_decay, buffer_size, batch_size, loss_type, device)
 
-        self.P_network = DQN()
-        self.T_network = DQN()
-        '''
-        if "typeof_dqn" in kwargs:
-            if kwargs["typeof_dqn"] == "DQN":
-                self.P_network = DQN()
-                self.T_network = DQN()
-            else:
-                self.P_network = DuellingDQN(kwargs["duelling_mode"])
-                self.T_network = DuellingDQN(kwargs["duelling_mode"])
-        '''
+
+        if "duellingdqn" in kwargs:
+            self.P_network = DuellingDQN()
+            self.T_network = DuellingDQN()
+        else:
+            self.P_network = DQN()
+            self.T_network = DQN()
+
         self.optimizer = optim.AdamW(self.P_network.parameters(), lr=1e-05)
 
         self.T_network.load_state_dict(self.P_network.state_dict())
@@ -195,6 +196,8 @@ class ClassicDQNAgent(DQNAgent):
     def update_target(self):
         return
 
+    def train(self):
+        return
 
     def learn_policy(self,episode_count=100):
 
@@ -289,14 +292,16 @@ class ClassicDQNAgent(DQNAgent):
             print("Episode:",episode, "Reward:",episode_reward)
             episode_logger.append([episode,episode_reward,0])
             #Update the weights for the target network after every episode
-            self.T_network.load_state_dict(self.P_network.state_dict())
+            if episode%5==0:
+                self.T_network.load_state_dict(self.P_network.state_dict())
+            self.epsilon *= self.epsilon_decay
         print("Learning complete")
         return episode_logger
 
 class DoubleDQNAgent(ClassicDQNAgent):
     #ref: https://www.datahubbs.com/double-deep-q-learning-to-get-the-most-out-of-your-dqn/
     def __init__(self, env, epsilon=0.5, gamma=0.99, epsilon_decay=1e-06,buffer_size=50, batch_size = 5, loss_type ="MSE", device=None,**kwargs):
-        super().__init__(env, epsilon, gamma, epsilon_decay, buffer_size, batch_size, loss_type, device)
+        super().__init__(env, epsilon, gamma, epsilon_decay, buffer_size, batch_size, loss_type, device,**kwargs)
 
     def learn_policy(self, episode_count=100):
 
@@ -312,6 +317,7 @@ class DoubleDQNAgent(ClassicDQNAgent):
             state, info = self.env.reset()
             go = True
             episode_reward = 0
+
             while go:
 
                 # Get the action
@@ -368,7 +374,8 @@ class DoubleDQNAgent(ClassicDQNAgent):
                     #the next state action value for the target network
                     best_next_state_actions = self.P_network(non_termination_next_states).argmax(1).unsqueeze(1)
 
-                    next_state_action_value[non_terminating_mask] = self.T_network(non_termination_next_states).gather(1,best_next_state_actions).squeeze(1)
+                    with torch.no_grad():
+                        next_state_action_value[non_terminating_mask] = self.T_network(non_termination_next_states).gather(1,best_next_state_actions).squeeze(1)
 
                     # Calculate the expected state action values
                     expected_state_action_values = (next_state_action_value * GAMMA) + rewards
@@ -381,7 +388,11 @@ class DoubleDQNAgent(ClassicDQNAgent):
 
                 state = next_state
 
-            print("Episode:", episode, "Reward:", episode_reward)
+            if episode%5==0:
+                self.T_network.load_state_dict(self.P_network.state_dict())
+
+            print("Episode:", episode, "Reward:", episode_reward, "Epsilon",self.epsilon)
+            self.epsilon *= self.epsilon_decay
             episode_logger.append([episode, episode_reward, 0])
             # Update the weights for the target network after every episode
             self.T_network.load_state_dict(self.P_network.state_dict())
@@ -389,9 +400,9 @@ class DoubleDQNAgent(ClassicDQNAgent):
         return episode_logger
 
 
-
 env = JungleEnv({"size":7})
-dqnagent = DoubleDQNAgent(env,buffer_size=10000,batch_size=128)
+kwargs = {}
+dqnagent = ClassicDQNAgent(env,buffer_size=10000,batch_size=256,**kwargs,epsilon=0.9,epsilon_decay=0.99,loss_type="SmoothL1")
 results = dqnagent.learn_policy(episode_count=50)
 results = np.array(results)
 for i in range(len(results)):
