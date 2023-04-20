@@ -263,13 +263,6 @@ class ClassicDQNAgent():
         print("Learning complete")
         return episode_logger
 
-    def obs_to_state(self,obs):
-        #ref: INM707 Lab 8
-        #Get the position information from the observation
-        state = obs["jungle_position"]
-
-        return torch.tensor(state,device=device,dtype=torch.float)
-
     def optimize_policy(self):
         batch = next(iter(self.replay_buffer))
         # We now have a batch of transitions on which we will train our networks
