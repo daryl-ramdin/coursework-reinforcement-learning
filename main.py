@@ -2,30 +2,22 @@ from matplotlib import pyplot as plt
 from jungle import  Jungle
 from hiker import HikerAgent
 import numpy as np
+import pandas as pd
 
 
 
 
 #Let's setup the environment
 
-'''
-jungle = Jungle(rows=7,cols=4,vanishing_treasure=True)
-jungle.add_mountains([(1, 3), (2, 3)])
-jungle.add_sinkholes([(7, 3)])
-jungle.add_bears([(4, 3)])
-jungle.add_rivers([(4, 2)])
-jungle.add_lakes([(4, 1)])
-jungle.add_exits([(4, 4), (7, 4)])
-jungle.add_treasure([(7,1)])
-'''
+
 jungle = Jungle(rows=5,cols=4,vanishing_treasure=False)
-jungle.add_mountains([(1, 3)])
-jungle.add_sinkholes([(2, 2)])
-jungle.add_bears([(4, 3)])
-jungle.add_rivers([(5, 2)])
-jungle.add_lakes([(4, 1)])
-jungle.add_exits([(4, 4), (5, 4)])
-jungle.add_tiger([(1,4)])
+jungle.add_topography([(1, 3, "M")])
+jungle.add_topography([(2, 2, "S")])
+jungle.add_topography([(4, 3, "B")])
+jungle.add_topography([(5, 2, "R")])
+jungle.add_topography([(4, 1, "L")])
+jungle.add_topography([(4, 4, "E"), (5, 4, "E")])
+jungle.add_topography([(1, 4, "T")])
 jungle.fill_r_matrix()
 
 #Set Q Learning parameters
@@ -125,6 +117,12 @@ plt.bar(x[:,[0]].reshape((episodes,)),x[:,[1]].reshape((episodes,)), label="E")
 plt.bar(x[:,[0]].reshape((episodes,)),x[:,[2]].reshape((episodes,)), label="S")
 plt.legend()
 plt.show()
+
+
+import pandas as pd
+my_df = pd.DataFrame(logger)
+my_df.to_csv('my_array.csv',header = False, index= False)
+
 '''
 #Our trend is of the format [epoch,number_of_timesteps,epochs_from_last, average_epochs, average_timesteps]
 #Get the average episode distance at each epsiode

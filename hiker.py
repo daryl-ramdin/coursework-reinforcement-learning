@@ -142,7 +142,7 @@ class HikerAgent:
         while 1:
             next_move = self.q_matrix[index].argmax()
             index = self.environment.get_new_index(index,next_move)
-            position = self.environment.get_position(index)
+            position = self.environment.index_to_position(index)
             topography = self.environment.get_topography(position)
             print("Move to:",position,topography)
             if topography in ["S","E"]: break

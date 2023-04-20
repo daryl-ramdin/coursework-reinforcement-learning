@@ -9,8 +9,8 @@ import numpy as np
 
 class JungleEnv(gym.Env):
 
-    def __init__(self, config):
-        self.size = config["size"]
+    def __init__(self, size):
+        self.size = size
 
         self.observation_space = spaces.Dict(
             {
@@ -22,7 +22,7 @@ class JungleEnv(gym.Env):
         self._jungle.build_jungle()
         self._jungle.reset()
 
-    def reset(self,start_position = None,seed = None,options = None):
+    def reset(self,start_position = None, seed = None,options = None):
         #ref INM707 Lab 6
         super().reset(seed=seed)
 
@@ -32,15 +32,16 @@ class JungleEnv(gym.Env):
         obs = self._jungle.reset()
 
         obs = {"jungle_position":np.array(obs)}
-        #self.render()
+
         return obs, {}
 
     def step(self, action):
         jaction = list(self._jungle.all_actions.keys())[action]
         reward, observation, available_moves, terminated, topography = self._jungle.move(jaction)
         #ref INM707 Lab 6
-        #print("action", jaction, "obs",observation,"reward",reward,"termindated",terminated)
         return {"jungle_position":np.array(observation)}, reward, terminated, False, topography
 
     def render(self):
         self._jungle.show()
+
+
