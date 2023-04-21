@@ -32,19 +32,38 @@ class HikerAgent:
         self.gamma = 0.9
         self.cumulative_reward = 0
         self.seed = seed
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+        self.treasure_counter = 0
         self.current_position, self.available_moves = self.reset_episode()
+
+    def reset_episode(self):
+        self.cumulative_reward = 0
+        self.treasure_counter = 0
+        self.current_position = self.environment.reset(self.seed)
+        self.available_moves = self.environment.get_available_moves(self.current_position)
+        return self.current_position, self.available_moves
 
     def train(self,**kwargs):
         self.epsilon = kwargs["epsilon"]
         self.alpha = kwargs["alpha"]
         self.gamma = kwargs["gamma"]
         self.epsilon_decay = kwargs["epsilon_decay"]
+        self.seed = kwargs["seed"]
+        random.seed(self.seed)
         timesteps = kwargs["timesteps"]
         episodes = kwargs["episodes"]
         experiment_id = kwargs["experiment_id"]
         episode_results = []
 
         for episode in range(episodes):
+            # For every episode increment the seed. This
+            # allows for the results to be reproduced and still make
+            # each episode different from the other
+
+            self.seed += 10
+            random.seed(self.seed)
+            np.random.seed(self.seed)
             self.reset_episode()
             steps_taken = 0
             action = None
@@ -54,7 +73,8 @@ class HikerAgent:
 
             # Run through the timesteps until we reach the end  our timestep limit
             for timestep in range(timesteps):
-                #Move based on the action
+
+                #Move based on the action. This will update the current position
                 can_move, next_action = self.move(action)
 
                 #If we cannot move, then the epsiode ends
@@ -64,7 +84,10 @@ class HikerAgent:
                 if self.sarsa:
                     action = next_action
                 else:
-                    # This is Q learning so select an action from the current position
+                    # This is Q learning so select an action from the current position.
+                    # This is usually at the start of the timestep. To cater for that
+                    # it is called before the first timestep. As that has been put in place
+                    # calling it at the end of the timestep achieves the same purpose
                     action = self.select_action(self.current_position, self.available_moves)
 
                 steps_taken += 1
@@ -75,7 +98,7 @@ class HikerAgent:
 
             episode_results.append({"experiment_id": experiment_id, "parameters": kwargs, "episode": episode,
                                     "episode_reward": self.cumulative_reward, "steps_taken": steps_taken,
-                                    "topography": topography})
+                                    "topography": topography, "treasure_counter":self.treasure_counter})
 
         return episode_results
 
@@ -86,7 +109,11 @@ class HikerAgent:
         #If there are available actions, then move
         if action is not None:
             #Move
-            reward, new_position, available_moves, terminated, topography = self.environment.move(action)
+            reward, new_position, available_moves, terminated, info = self.environment.move(action)
+
+            #If the agent collected the treasure, increase the treasure counter
+            if info["topography"]=="$":
+                self.treasure_counter += 1
 
             #If new_position is not None then it means we can move
             if new_position is not None:
@@ -176,28 +203,24 @@ class HikerAgent:
 
             # Let's get all the available actions that have this q_max. Important to note
             # that flatnonzero will return more indices into moves
-            best_action_values = avlbl_moves[np.flatnonzero(self.q_matrix[r_index, avlbl_moves] == q_max)]
-            best_actions = [i[0] for i in list(self.environment.all_actions.items()) if i[1] in best_action_values]
+            best_action_indices = avlbl_moves[np.flatnonzero(self.q_matrix[r_index, avlbl_moves] == q_max)]
+            best_actions = [i[0] for i in list(self.environment.all_actions.items()) if i[1] in best_action_indices]
 
             #We are using Epsilon-greedy
             #If epsilon=0 then Greedy
             #If epsilon=1 then Random
             #ref: INM707 Lab 4
             if np.random.uniform() > self.epsilon:
-                #We exploit. Choose the available move that has the highest estimated reward
+                #We exploit. Choose the available move that has the highest estimated reward.
+                #In case there are multiple moves that share the same maximum q value, we randomly
+                #choose one
                 next_action = np.random.choice(best_actions)
             else:
                 # We explore. Randomly choose from the available moves
-                action_value = np.random.choice(avlbl_moves)
-                next_action = [i[0] for i in list(self.environment.all_actions.items()) if i[1] == action_value][0]
+                action_index = np.random.choice(avlbl_moves)
+                next_action = [i[0] for i in list(self.environment.all_actions.items()) if i[1] == action_index][0]
 
         return next_action
-
-    def reset_episode(self):
-        self.cumulative_reward = 0
-        self.current_position = self.environment.reset()
-        self.available_moves = self.environment.get_available_moves(self.current_position)
-        return self.current_position, self.available_moves
 
     def get_current_topography(self):
         return self.environment.get_topography(self.current_position)

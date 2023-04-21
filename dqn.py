@@ -342,7 +342,7 @@ class DoubleDQNAgent(ClassicDQNAgent):
 gc.collect()
 env = JungleEnv(7)
 kwargs = {}
-dqnagent = ClassicDQNAgent(env,buffer_size=5000,batch_size=500,
+dqnagent = DoubleDQNAgent(env,buffer_size=5000,batch_size=500,
                            learning_rate=1e-02,
                            gamma=1,
                            target_update_interval=10,

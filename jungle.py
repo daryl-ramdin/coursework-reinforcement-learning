@@ -19,6 +19,8 @@ class Jungle:
         #self.agent_position = None
 
         self.seed = seed
+        random.seed(self.seed)
+        np.random.seed(self.seed)
 
         #Let's add the rewards. They're as follows:
         #F: Jungle floor that takes 1 day to cross and you lose 1 point
@@ -48,9 +50,10 @@ class Jungle:
         #Blocked Locations: There are no blocked locatoin as yet
         self.blocked_locations = []
 
-    def reset(self):
+    def reset(self,seed):
         #Initialise the variables that change state
-
+        random.seed(seed)
+        np.random.seed(seed)
         # Randomly choose a start position that is not in a termination state
         self.agent_position = [random.randint(1, self.rows), random.randint(1, self.cols)]
 
@@ -60,7 +63,9 @@ class Jungle:
         # Return the agent's position
         return self.agent_position
 
-    def build_jungle(self):
+    def build_jungle(self,seed):
+        random.seed(seed)
+        np.random.seed(seed)
         #Let's create a random jungle.
         position_indices = list(range(0,(self.rows*self.cols)))
         available_positions = [self.index_to_position(i) for i in position_indices]
