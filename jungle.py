@@ -13,6 +13,7 @@ class Jungle:
         self.vanishing_treasure = vanishing_treasure
         self.all_actions = {"North":0,"South":1,"East":2,"West":3}
         self.penalty = -5   #The penalty for making an illegal move
+
         #Ref INM707 Lab 6
         #self.blocked_locations = []
         #self.agent_position = None
@@ -51,10 +52,7 @@ class Jungle:
         #Initialise the variables that change state
 
         # Randomly choose a start position that is not in a termination state
-        keep_searching = True
-        while keep_searching:
-            self.agent_position = [random.randint(1, self.rows), random.randint(1, self.cols)]
-            if self.get_topography(self.agent_position) not in self.termination_topography:keep_searching = False
+        self.agent_position = [random.randint(1, self.rows), random.randint(1, self.cols)]
 
         # Clear the blocked locations
         self.blocked_locations = []
@@ -132,44 +130,47 @@ class Jungle:
         #Get the list of available moves from this location
         available_moves = self.get_available_moves(from_position)
 
-        #If the move is in the list of available moves, then continue
-        #otherwise terminate and return nothing
-        if in_direction in available_moves:
-            if in_direction == "North":
-                new_position = (from_position[0]-1,from_position[1])
-            elif in_direction == "South":
-                new_position = (from_position[0]+1, from_position[1])
-            elif in_direction == "East":
-                new_position = (from_position[0], from_position[1]+1)
+        #If there are none it means the hiker has reached a terminating state
+        if len(available_moves)> 0:
+
+            #If the move is in the list of available moves, then continue
+            #otherwise terminate and return nothing
+            if in_direction in available_moves:
+                if in_direction == "North":
+                    new_position = (from_position[0]-1,from_position[1])
+                elif in_direction == "South":
+                    new_position = (from_position[0]+1, from_position[1])
+                elif in_direction == "East":
+                    new_position = (from_position[0], from_position[1]+1)
+                else:
+                    new_position = (from_position[0],from_position[1]-1)
+
+                reward = self.get_reward(new_position)
+
+                topography = self.get_topography(new_position)
+
+                #If the agent is at the exit or sink hole then set the terminated flag to True
+                #as the agent can no longer move. ref: https://github.com/openai/gym/blob/master/gym/envs/classic_control/mountain_car.py
+                if topography in self.termination_topography: terminated = True
+
+                #If vanishing_treasure is true and we are on a position with treasure,
+                #then this position cannot be revisited
+                if self.vanishing_treasure and topography=="$":
+                    self.block_revisits([new_position])
+
+                #If revisits is false, then the current position cannot be revisited
+                if self.revisits==False:
+                    self.block_revisits([new_position])
+
+                #Set the new position of the agent
+                self.agent_position = new_position
             else:
-                new_position = (from_position[0],from_position[1]-1)
-
-            reward = self.get_reward(new_position)
-
-            topography = self.get_topography(new_position)
-
-            #If the agent is at the exit or sink hole then set the terminated flag to True
-            #as the agent can no longer move. ref: https://github.com/openai/gym/blob/master/gym/envs/classic_control/mountain_car.py
-            if topography in self.termination_topography: terminated = True
-
-            #If vanishing_treasure is true and we are on a position with treasure,
-            #then this position cannot be revisited
-            if self.vanishing_treasure and topography=="$":
-                self.block_revisits([new_position])
-
-            #If revisits is false, then the current position cannot be revisited
-            if self.revisits==False:
-                self.block_revisits([new_position])
-
-            #Set the new position of the agent
-            self.agent_position = new_position
+                # You cannot make this move so you are penalised
+                # ref: INM707 Lab 8
+                reward = self.penalty
         else:
-            # You cannot make this move so you are penalised
-            # ref: INM707 Lab 8
-            reward = self.penalty
+            terminated = True
 
-        if topography=="S" and terminated == False:
-            print("STOP HERE")
         info = {"topography": topography}
         return reward, new_position, available_moves, terminated, info
 

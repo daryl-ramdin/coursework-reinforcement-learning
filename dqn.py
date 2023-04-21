@@ -3,9 +3,7 @@ import gc
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.nn.functional as F #INM707 Lab 8
-import gymnasium as gym
 import random
 from jungleenv import JungleEnv
 import matplotlib.pyplot as plt
@@ -150,7 +148,7 @@ class ReplayBuffer:
 
 class ClassicDQNAgent():
 
-    def __init__(self, env, epsilon=0.9, gamma=0.99, epsilon_decay=0.99,buffer_size=50, batch_size = 5, target_update_interval = 5, loss_type ="MSE", device=None,
+    def __init__(self, env, epsilon=0.9, gamma=0.99, epsilon_decay=0.99,learning_rate=1e-05,buffer_size=50, batch_size = 5, target_update_interval = 5, loss_type ="MSE", device=None,
                  duelling=False):
         self.epsilon = epsilon
         self.gamma = gamma
@@ -179,7 +177,7 @@ class ClassicDQNAgent():
             self.P_network = DQN()
             self.T_network = DQN()
 
-        self.optimizer = optim.AdamW(self.P_network.parameters(), lr=1e-05)
+        self.optimizer = optim.AdamW(self.P_network.parameters(), lr=learning_rate)
 
         self.T_network.load_state_dict(self.P_network.state_dict())
 
@@ -300,8 +298,8 @@ class ClassicDQNAgent():
 
 class DoubleDQNAgent(ClassicDQNAgent):
     #ref: https://www.datahubbs.com/double-deep-q-learning-to-get-the-most-out-of-your-dqn/
-    def __init__(self, env, epsilon=0.5, gamma=0.99, epsilon_decay=1e-06,buffer_size=50, batch_size = 5, target_update_interval = 5, loss_type ="MSE", device=None,duelling=False):
-        super().__init__(env, epsilon, gamma, epsilon_decay, buffer_size, batch_size, target_update_interval, loss_type, device,duelling)
+    def __init__(self, env, epsilon=0.5, gamma=0.99, epsilon_decay=1e-06, learning_rate=1e-05,buffer_size=50, batch_size = 5, target_update_interval = 5, loss_type ="MSE", device=None,duelling=False):
+        super().__init__(env, epsilon, gamma, epsilon_decay, learning_rate, buffer_size, batch_size, target_update_interval, loss_type, device,duelling)
 
     def optimize_policy(self, episode_count=100):
 
@@ -344,12 +342,14 @@ class DoubleDQNAgent(ClassicDQNAgent):
 gc.collect()
 env = JungleEnv(7)
 kwargs = {}
-dqnagent = DoubleDQNAgent(env,buffer_size=1000,batch_size=100,
-                          target_update_interval=10,
-                          epsilon=0.9,epsilon_decay=0.9,
-                          loss_type=LossFunction.MSE,
-                          duelling=True)
-results = dqnagent.train(episode_count=100)
+dqnagent = ClassicDQNAgent(env,buffer_size=5000,batch_size=500,
+                           learning_rate=1e-02,
+                           gamma=1,
+                           target_update_interval=10,
+                           epsilon=0.9,epsilon_decay=0.99,
+                           loss_type=LossFunction.MSE,
+                           duelling=False)
+results = dqnagent.train(episode_count=50)
 
 
 rewards = np.array([[res["episode"], res["episode_reward"],0] for res in results])
