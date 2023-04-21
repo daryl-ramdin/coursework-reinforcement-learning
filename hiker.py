@@ -17,58 +17,95 @@ class LearningBy:
 
 
 class HikerAgent:
-    def __init__(self,start_position, epsilon, alpha, gamma, policy_type, jungle: Jungle, sarsa=False, seed=45):
+    def __init__(self, jungle: Jungle, sarsa=False, seed=45):
         self.environment = jungle
         self.initialise_q_matrix()
-        self.current_position = start_position
         #ref: https://www.geeksforgeeks.org/assign-function-to-a-variable-in-python/
-        if sarsa:
-            self.policy_update = self.sarsa
+        self.sarsa = sarsa
+        if self.sarsa:
+            self.policy_update = self.sarsa_learn
         else:
-            self.policy_update = self.qlearn
-        self.available_moves = self.environment.get_available_moves(self.current_position)
-        self.initial_epsilon = epsilon
-        self.epsilon = self.initial_epsilon
-        self.alpha = alpha
-        self.gamma = gamma
-        self.policy_type = policy_type
+            self.policy_update = self.q_learn
+        self.epsilon = 0.9
+        self.epsilon_decay = 1e-03
+        self.alpha = 0.9
+        self.gamma = 0.9
         self.cumulative_reward = 0
         self.seed = seed
+        self.current_position, self.available_moves = self.reset_episode()
 
-    def move(self):
-        can_move = False
-        #Let's see if we can move
-        if len(self.available_moves) > 0:
-            next_action = self.get_next_action(self.current_position,self.available_moves)
-            #print("Next actions",next_action)
+    def train(self,**kwargs):
+        self.epsilon = kwargs["epsilon"]
+        self.alpha = kwargs["alpha"]
+        self.gamma = kwargs["gamma"]
+        self.epsilon_decay = kwargs["epsilon_decay"]
+        timesteps = kwargs["timesteps"]
+        episodes = kwargs["episodes"]
+        experiment_id = kwargs["experiment_id"]
+        episode_results = []
 
-            #If there are no available actions, then do nothing
-            if next_action is None:
-                can_move = False
-            else:
-                #Move
-                reward, new_position, available_moves, terminated, topography = self.environment.move(next_action)
+        for episode in range(episodes):
+            self.reset_episode()
+            steps_taken = 0
+            action = None
 
-                #If new_position is none then it means we cannot move
-                if new_position is None:
-                    can_move = False
+            #Select the first action
+            action = self.select_action(self.current_position,self.available_moves)
+
+            # Run through the timesteps until we reach the end  our timestep limit
+            for timestep in range(timesteps):
+                #Move based on the action
+                can_move, next_action = self.move(action)
+
+                #If we cannot move, then the epsiode ends
+                if not can_move: break
+
+                #If this is sarsa, then next action becomes the action
+                if self.sarsa:
+                    action = next_action
                 else:
-                    #Update the cumulative reward
-                    self.cumulative_reward+=reward
+                    # This is Q learning so select an action from the current position
+                    action = self.select_action(self.current_position, self.available_moves)
 
-                    #The next step is to update the q matrix with the reward
-                    self.policy_update(reward,self.current_position, new_position, next_action,available_moves)
+                steps_taken += 1
+                self.epsilon = self.epsilon * self.epsilon_decay
 
-                    #Update the agent's state and available moves
-                    self.current_position = new_position
-                    self.available_moves = available_moves
+            # Let's see what state the hiker ended up in
+            topography = self.get_current_topography()
 
-                    #Check to see if we can move. If the terminated state is True, then we cannot move
-                    can_move = not terminated
-        else:
-            #print("No more moves")
-            can_move = False
-        return can_move
+            episode_results.append({"experiment_id": experiment_id, "parameters": kwargs, "episode": episode,
+                                    "episode_reward": self.cumulative_reward, "steps_taken": steps_taken,
+                                    "topography": topography})
+
+        return episode_results
+
+    def move(self,action):
+        can_move = False
+
+        next_action = None
+        #If there are available actions, then move
+        if action is not None:
+            #Move
+            reward, new_position, available_moves, terminated, topography = self.environment.move(action)
+
+            #If new_position is not None then it means we can move
+            if new_position is not None:
+                #Update the cumulative reward
+                self.cumulative_reward+=reward
+
+                #The next step is to update the q matrix with the reward.
+                # If sarsa then we get set our action to the result of the policy_update
+                # which is the action for the next state
+                next_action = self.policy_update(reward,self.current_position, new_position, action, available_moves)
+
+                #Update the agent's state and available moves
+                self.current_position = new_position
+                self.available_moves = available_moves
+
+                #Check to see if we can move. If the terminated state is True, then we cannot move
+                can_move = not terminated
+
+        return can_move, next_action
 
     def initialise_q_matrix(self):
         self.q_matrix = np.full(self.environment.reward_matrix.shape, 0)
@@ -76,7 +113,7 @@ class HikerAgent:
     def get_q_value(self,state,action_index):
         return self.q_matrix[self.environment.get_r_index((state[0],state[1])), action_index]
 
-    def qlearn(self, reward, state, next_state, action, available_moves):
+    def q_learn(self, reward, state, next_state, action, available_moves):
         #We will update the Q value for the given state and action
         #For Q Learning we do not use the available moves
 
@@ -97,9 +134,9 @@ class HikerAgent:
         q_value_new = q_value_old + self.alpha * ( reward+(self.gamma*q_max) - q_value_old)
 
         self.q_matrix[self.environment.get_r_index((row,col)), action_index] = q_value_new
-        return q_value_old, q_max, q_value_new
+        return None
 
-    def sarsa(self, reward, state, next_state, action, available_moves):
+    def sarsa_learn(self, reward, state, next_state, action, available_moves):
         # ref: https://towardsdatascience.com/q-learning-and-sasar-with-python-3775f86bd178
         # We will update the Q value for the given state and action
         # The state defines the position at which the action was taken
@@ -112,7 +149,7 @@ class HikerAgent:
         q_value_old = self.get_q_value(state, action_index)
 
         #For SARSA, we get the Q value for taking an action in the next state
-        next_state_action = self.get_next_action(next_state,available_moves)
+        next_state_action = self.select_action(next_state,available_moves)
         next_state_action_index = self.environment.all_actions[next_state_action]
         q_value_next = self.get_q_value(next_state, next_state_action_index)
 
@@ -120,9 +157,9 @@ class HikerAgent:
         q_value_new = q_value_old + self.alpha * (reward + (self.gamma * q_value_next) - q_value_old)
 
         self.q_matrix[self.environment.get_r_index((row, col)), action_index] = q_value_new
-        return q_value_old, q_value_next, q_value_new
+        return next_state_action
 
-    def get_next_action(self,position, available_moves):
+    def select_action(self,position, available_moves):
         #Create a list of available moves from the curent state
         avlbl_moves = np.array([x for x in available_moves.values()])
 
@@ -142,28 +179,25 @@ class HikerAgent:
             best_action_values = avlbl_moves[np.flatnonzero(self.q_matrix[r_index, avlbl_moves] == q_max)]
             best_actions = [i[0] for i in list(self.environment.all_actions.items()) if i[1] in best_action_values]
 
-            #Let's look at our learning policy
-            if self.policy_type == 'Greedy':
-                #Randomly choose best action. If there is only one, the code below will select it
-                #best_action = best_actions[random.randint(0,len(best_actions)-1)]
+            #We are using Epsilon-greedy
+            #If epsilon=0 then Greedy
+            #If epsilon=1 then Random
+            #ref: INM707 Lab 4
+            if np.random.uniform() > self.epsilon:
+                #We exploit. Choose the available move that has the highest estimated reward
                 next_action = np.random.choice(best_actions)
             else:
-                #We are using Epsilon-greedy
-                #ref: INM707 Lab 4
-                if np.random.uniform() > self.epsilon:
-                    #We exploit. Choose the available move that has the highest estimated reward
-                    next_action = np.random.choice(best_actions)
-                else:
-                    # We explore. Randomly choose from the available moves
-                    action_value = np.random.choice(avlbl_moves)
-                    next_action = [i[0] for i in list(self.environment.all_actions.items()) if i[1] == action_value][0]
+                # We explore. Randomly choose from the available moves
+                action_value = np.random.choice(avlbl_moves)
+                next_action = [i[0] for i in list(self.environment.all_actions.items()) if i[1] == action_value][0]
 
         return next_action
 
-    def random_start(self):
+    def reset_episode(self):
         self.cumulative_reward = 0
         self.current_position = self.environment.reset()
         self.available_moves = self.environment.get_available_moves(self.current_position)
+        return self.current_position, self.available_moves
 
     def get_current_topography(self):
         return self.environment.get_topography(self.current_position)
@@ -181,11 +215,6 @@ class HikerAgent:
             topography = self.environment.get_topography(position)
             print("Move to:",position,topography)
             if topography in ["S","E"]: break
-
-
-
-
-
 
 
 

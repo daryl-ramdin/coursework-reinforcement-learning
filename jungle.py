@@ -32,7 +32,7 @@ class Jungle:
         #self.topographies = {"R":self.rivers,"B":self.bears,"L":self.lakes,"M":self.mountains,"S":self.sinkholes,"T":self.treasure,"E":self.exits}
         #self.topographies = ("R", "B", "L", "M", "S", "T", "E")
 
-        self.rewards = {"_":-1,"R":-5,"B":-10,"L":-2,"M":-5,"S":-100,"T":-10,"$":0,"E":5000}
+        self.rewards = {"_":-1,"R":-5,"B":-10,"L":-2,"M":-5,"S":-100,"T":-10,"$":500,"E":5000}
         self.termination_topography = ["S","E"]
 
         self.jungle_floor = np.full([self.rows,self.cols,],'_')
