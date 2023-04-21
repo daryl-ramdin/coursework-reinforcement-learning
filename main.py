@@ -16,10 +16,19 @@ timesteps = 100
 
 
 parameters = [
-    {"experiment_id":1, "seed":45, "sarsa":False, "epsilon": 1, "alpha":0.7, "gamma": 0.9, "epsilon_decay":0.999, "timesteps":timesteps, "episodes":episodes, "display":["epsilon"]},
-    {"experiment_id":2, "seed":50, "sarsa":False,  "epsilon": 0.9, "alpha":0.7, "gamma": 0.9, "epsilon_decay":0.999, "timesteps":timesteps, "episodes":episodes, "display":["epsilon"]},
-    {"experiment_id":3, "seed":55, "sarsa":False,  "epsilon": 0.5, "alpha":0.7, "gamma": 0.9, "epsilon_decay":0.999, "timesteps":timesteps, "episodes":episodes, "display":["epsilon"]},
-    {"experiment_id":4, "seed":60, "sarsa":False,  "epsilon": 0, "alpha":0.7, "gamma": 0.9, "epsilon_decay":0.999, "timesteps":timesteps, "episodes":episodes, "display":["epsilon"]}
+    {"experiment_id": 1, "seed": 5, "sarsa": True, "Policy": "SARSA Epsilon Greedy", "epsilon": 0.9, "alpha": 0.7,
+     "gamma": 0.7, "epsilon_decay": 0.999, "timesteps": timesteps, "episodes": episodes, "display": ["Policy"]},
+    # {"experiment_id":6, "seed":5, "sarsa":False, "Policy":"SARSA Greedy Policy",        "epsilon": 0,   "alpha":0.7, "gamma": 0.7, "epsilon_decay":0, "timesteps":timesteps, "episodes":episodes, "display":["Policy"]},
+    # {"experiment_id":5, "seed":5, "sarsa":True,  "Policy":"SARSA Random Policy",        "epsilon": 1,   "alpha":0.7, "gamma": 0.7, "epsilon_decay":1, "timesteps":timesteps, "episodes":episodes, "display":["Policy"]},
+    {"experiment_id": 2, "seed": 5, "sarsa": False, "Policy": "Q-Learning Epsilon Greedy", "epsilon": 0.9, "alpha": 0.7,
+     "gamma": 0.7, "epsilon_decay": 0.999, "timesteps": timesteps, "episodes": episodes, "display": ["Policy"]}
+    # {"experiment_id":3, "seed":5, "sarsa":False, "Policy":"Q-Learning Greedy Policy",   "epsilon": 0,   "alpha":0.7, "gamma": 0.7, "epsilon_decay":0, "timesteps":timesteps, "episodes":episodes, "display":["Policy"]},
+    # {"experiment_id":4, "seed":5, "sarsa":False,  "Policy":"Q-Learning Random Policy",  "epsilon": 1,   "alpha":0.7, "gamma": 0.7, "epsilon_decay":1, "timesteps":timesteps, "episodes":episodes, "display":["Policy"]},
+
+    # {"experiment_id":5, "seed":5, "sarsa":False,  "title": "epsilon": 0.9, "alpha":0.7, "gamma": 0, "epsilon_decay":0.999, "timesteps":timesteps, "episodes":episodes, "display":["gamma"]}
+    # {"experiment_id":6, "seed":5, "sarsa":False,  "epsilon": 0.9, "alpha":0.7, "gamma": 0.2, "epsilon_decay":0.999, "timesteps":timesteps, "episodes":episodes, "display":["gamma"]},
+    # {"experiment_id":7, "seed":5, "sarsa":False,  "epsilon": 0.9, "alpha":0.7, "gamma": 0.1, "epsilon_decay":0.999, "timesteps":timesteps, "episodes":episodes, "display":["gamma"]},
+    # {"experiment_id":8, "seed":5, "sarsa":False,  "epsilon": 0.9, "alpha":0.7, "gamma": 0, "epsilon_decay":0.999, "timesteps":timesteps, "episodes":episodes, "display":["gamma"]}
 ]
 
 

@@ -46,15 +46,16 @@ class HikerAgent:
 
     def train(self,**kwargs):
         self.epsilon = kwargs["epsilon"]
+        self.epsilon_decay = kwargs["epsilon_decay"]
         self.alpha = kwargs["alpha"]
         self.gamma = kwargs["gamma"]
-        self.epsilon_decay = kwargs["epsilon_decay"]
         self.seed = kwargs["seed"]
         random.seed(self.seed)
         timesteps = kwargs["timesteps"]
         episodes = kwargs["episodes"]
         experiment_id = kwargs["experiment_id"]
         episode_results = []
+        self.initialise_q_matrix()
 
         for episode in range(episodes):
             # For every episode increment the seed. This
