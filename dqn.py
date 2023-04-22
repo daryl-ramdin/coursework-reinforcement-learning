@@ -28,7 +28,7 @@ class LossFunction():
 
 class DQN(nn.Module):
     #This is the DQN class
-    def __init__(self, sizeof_obs_space=2, sizeof_act_space=4,sizeof_hidden=254,number_of_layers=4,device=None):
+    def __init__(self, sizeof_obs_space=2, sizeof_act_space=4,sizeof_hidden=256,number_of_layers=4,device=None):
         #ref: INM 707 Lab 8 Feedback
         super().__init__()
         '''
@@ -38,31 +38,40 @@ class DQN(nn.Module):
         self.sizeof_act_space = sizeof_act_space
         self.sizeof_hidden = sizeof_hidden
 
-
+        #Create the first layer
         self.seq = nn.Sequential(
             nn.Linear(self.sizeof_obs_space, self.sizeof_hidden),
             nn.ReLU())
 
+        #Add the intermediate layers
         for i in range(0, number_of_layers-2):
             self.seq.append(module=nn.Linear(self.sizeof_hidden, self.sizeof_hidden))
             self.seq.append(nn.ReLU())
 
+        #add the final layer
         self.seq.append(nn.Linear(self.sizeof_hidden, self.sizeof_act_space))
-
-        '''
-        self.fc1 = nn.Linear(sizeof_obs_space, sizeof_hidden,device=device)
-        self.fc2 = nn.Linear(sizeof_hidden, sizeof_hidden,device=device)
-        self.fc3 = nn.Linear(sizeof_hidden, sizeof_hidden,device=device)
-        self.fc4 = nn.Linear(sizeof_hidden, sizeof_act_space,device=device)
-        '''
-
         self.seq.to(device=device)
 
-        #ref https://www.geeksforgeeks.org/initialize-weights-in-pytorch/
-        #ref: https://github.com/pytorch/examples/blob/main/dcgan/main.py#L95
+        #Initialise the weights
+        # ref https://www.geeksforgeeks.org/initialize-weights-in-pytorch/
+        # ref: https://github.com/pytorch/examples/blob/main/dcgan/main.py#L95
         for mod in self.seq:
-            if mod.__class__.__name__=="Linear":
-                torch.nn.init.normal_(mod.weight,mean=0, std=1)
+            if mod.__class__.__name__ == "Linear":
+                torch.nn.init.normal_(mod.weight, mean=0, std=1)
+
+        # self.fc1 = nn.Linear(sizeof_obs_space, sizeof_hidden,device=device)
+        # self.fc2 = nn.Linear(sizeof_hidden, sizeof_hidden,device=device)
+        # self.fc3 = nn.Linear(sizeof_hidden, sizeof_hidden,device=device)
+        # self.fc4 = nn.Linear(sizeof_hidden, sizeof_act_space,device=device)
+        #
+        # torch.nn.init.normal_(self.fc1.weight, mean=0, std=1)
+        # torch.nn.init.normal_(self.fc2.weight, mean=0, std=1)
+        # torch.nn.init.normal_(self.fc3.weight, mean=0, std=1)
+        # torch.nn.init.normal_(self.fc4.weight, mean=0, std=1)
+
+
+
+
 
     def forward(self,input):
         #Run the forward pass. ref: INM707 Lab 8
@@ -79,9 +88,10 @@ class DuellingDQN(nn.Module):
     def __init__(self,sizeof_obs_space=2, sizeof_act_space=4,sizeof_hidden=256,
                  number_of_common=2,number_of_value = 2,number_of_advantage=2, device=None):
         super().__init__()
+
         self.sizeof_obs_space = sizeof_obs_space
         self.sizeof_act_space = sizeof_act_space
-        self.sizeof_hidden = 256
+        self.sizeof_hidden = sizeof_hidden
         self.mode = "mean"
 
         #Our DQN contains two additional layers, one for the value and the other the advantage
@@ -107,7 +117,7 @@ class DuellingDQN(nn.Module):
         #     nn.ReLU())
 
         for i in range(0, number_of_value):
-            if i==0:
+            if i == 0:
                 #Add the first layer
                 self.value_stream = nn.Sequential(
                     nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
@@ -138,7 +148,7 @@ class DuellingDQN(nn.Module):
                 self.advantage_stream = nn.Sequential(
                     nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
                     nn.ReLU())
-            elif i == number_of_value - 1:
+            elif i == number_of_advantage - 1:
                 # Add the last layer
                 self.advantage_stream.append(nn.Linear(self.sizeof_hidden, 1))
             else:
@@ -257,7 +267,7 @@ class ClassicDQNAgent():
 
         return next_action.item()
 
-    def train(self,experiment_id, episodes=100,seed=45):
+    def train(self,experiment_id, episodes=100,seed=45, progress_update=10):
 
         self.seed = seed
         #Reset and render our environment
@@ -281,6 +291,7 @@ class ClassicDQNAgent():
             observation, info = self.env.reset(seed=self.seed)
             go = True
             episode_reward = 0
+            treasure_counter =  0
             steps_taken = 0
             # Our first step is to transform the state.
             state = observation
@@ -296,6 +307,9 @@ class ClassicDQNAgent():
 
                 #Increment the reward and use the observation as the next state
                 episode_reward += reward
+
+                if info["topography"] == "$":
+                    treasure_counter += 1
 
                 # INM 707 Lab 8
                 if terminated:
@@ -318,8 +332,9 @@ class ClassicDQNAgent():
                 go = not terminated
 
             #Get the results
-            episode_results.append({"experiment_id": experiment_id, "parameters": self.parameters, "episode":episode,"episode_reward":episode_reward,"steps_taken":steps_taken, "topography": info["topography"]})
-            print("Episode",episode,"Reward",episode_reward, "Epsilon", self.epsilon, "Steps Taken",steps_taken,"Topography", info["topography"])
+            episode_results.append({"experiment_id": experiment_id, "parameters": self.parameters, "episode":episode,"episode_reward":episode_reward,"treasure_counter": treasure_counter, "steps_taken":steps_taken, "topography": info["topography"]})
+            if episode%progress_update == 0:
+                print("Episode",episode,"Reward",episode_reward, "Epsilon", self.epsilon, "Steps Taken",steps_taken,"Topography", info["topography"])
 
             #Update the weights for the target network after every episode
             if episode%self.target_update_interval==0:
