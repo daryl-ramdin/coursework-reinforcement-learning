@@ -9,7 +9,7 @@ import numpy as np
 
 class JungleEnv(gym.Env):
 
-    def __init__(self, size):
+    def __init__(self, size, seed=45):
         self.size = size
 
         self.observation_space = spaces.Dict(
@@ -17,19 +17,26 @@ class JungleEnv(gym.Env):
                 "jungle_position":spaces.Box(low=1,high=self.size,shape=(2,), dtype=np.int)
             }
         )
+        self.seed = seed
+        random.seed(self.seed)
+        np.random.seed(self.seed)
         self.action_space = spaces.Discrete(4)
         self._jungle = Jungle(self.size,self.size)
-        self._jungle.build_jungle()
-        self._jungle.reset()
+        self._jungle.build_jungle(seed)
+        self._jungle.reset(seed)
 
-    def reset(self,start_position = None, seed = None,options = None):
+    def reset(self,start_position = None, seed = 45,options = None):
         #ref INM707 Lab 6
         super().reset(seed=seed)
 
+        self.seed = seed
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+
         #Create a new JungleEnv
-        self._jungle = Jungle(rows=self.size, cols=self.size,vanishing_treasure=False)
-        self._jungle.build_jungle()
-        obs = self._jungle.reset()
+        self._jungle = Jungle(rows=self.size, cols=self.size,vanishing_treasure=False,seed=self.seed)
+        self._jungle.build_jungle(seed=self.seed)
+        obs = self._jungle.reset(seed=self.seed)
 
         obs = {"jungle_position":np.array(obs)}
 

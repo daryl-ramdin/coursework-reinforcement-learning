@@ -136,7 +136,7 @@ class HikerAgent:
         return can_move, next_action
 
     def initialise_q_matrix(self):
-        self.q_matrix = np.full(self.environment.reward_matrix.shape, 0)
+        self.q_matrix = np.full(self.environment.reward_shape, 0)
 
     def get_q_value(self,state,action_index):
         return self.q_matrix[self.environment.get_r_index((state[0],state[1])), action_index]
@@ -147,7 +147,7 @@ class HikerAgent:
 
         #The state defines the position at which the action was taken
         #Get the index into the Q matrix
-        shape = self.environment.reward_matrix.shape
+        shape = self.environment.reward_shape
         row, col = state[0],state[1]
         action_index = self.environment.all_actions[action]
 
@@ -169,7 +169,7 @@ class HikerAgent:
         # We will update the Q value for the given state and action
         # The state defines the position at which the action was taken
         # Get the index into the Q matrix
-        shape = self.environment.reward_matrix.shape
+        shape = self.environment.reward_shape
         row, col = state[0], state[1]
         action_index = self.environment.all_actions[action]
 

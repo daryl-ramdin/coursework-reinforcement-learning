@@ -5,8 +5,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F #INM707 Lab 8
 import random
-from jungleenv import JungleEnv
-import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 import torch.optim as optim
 
@@ -30,7 +28,7 @@ class LossFunction():
 
 class DQN(nn.Module):
     #This is the DQN class
-    def __init__(self, sizeof_obs_space=2, sizeof_act_space=4,sizeof_hidden=254):
+    def __init__(self, sizeof_obs_space=2, sizeof_act_space=4,sizeof_hidden=254,number_of_layers=4,device=None):
         #ref: INM 707 Lab 8 Feedback
         super().__init__()
         '''
@@ -40,49 +38,46 @@ class DQN(nn.Module):
         self.sizeof_act_space = sizeof_act_space
         self.sizeof_hidden = sizeof_hidden
 
+
         self.seq = nn.Sequential(
             nn.Linear(self.sizeof_obs_space, self.sizeof_hidden),
-            nn.ReLU(),
-            nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
-            nn.ReLU(),
-            nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
-            nn.ReLU(),
-            nn.Linear(self.sizeof_hidden, self.sizeof_act_space)
-        )
+            nn.ReLU())
+
+        for i in range(0, number_of_layers-2):
+            self.seq.append(module=nn.Linear(self.sizeof_hidden, self.sizeof_hidden))
+            self.seq.append(nn.ReLU())
+
+        self.seq.append(nn.Linear(self.sizeof_hidden, self.sizeof_act_space))
+
         '''
-        self.fc1 = nn.Linear(self.sizeof_obs_space,256)
-        self.fc2 = nn.Linear(256,256)
-        self.fc3 = nn.Linear(256, 256)
-        self.fc4 = nn.Linear(256, self.sizeof_act_space)
+        self.fc1 = nn.Linear(sizeof_obs_space, sizeof_hidden,device=device)
+        self.fc2 = nn.Linear(sizeof_hidden, sizeof_hidden,device=device)
+        self.fc3 = nn.Linear(sizeof_hidden, sizeof_hidden,device=device)
+        self.fc4 = nn.Linear(sizeof_hidden, sizeof_act_space,device=device)
         '''
-        '''
-        self.layers = []
-        for layer in configuration:
-            self.layers.append(nn.Linear(in_features=layer["in"],out_features=layer["out"]))
-        '''
+
+        self.seq.to(device=device)
+
+        #ref https://www.geeksforgeeks.org/initialize-weights-in-pytorch/
+        #ref: https://github.com/pytorch/examples/blob/main/dcgan/main.py#L95
+        for mod in self.seq:
+            if mod.__class__.__name__=="Linear":
+                torch.nn.init.normal_(mod.weight,mean=0, std=1)
 
     def forward(self,input):
         #Run the forward pass. ref: INM707 Lab 8
-        '''
-        input = F.relu(self.fc1(input))
-        input = F.relu(self.fc2(input))
-        input = F.relu(self.fc3(input))
-        output = self.fc4(input)
-        '''
-        '''
-        i = 0
-        for i in range(len(self.layers)-1):
-            input = F.relu(self.layers[i](input))
-        #return the output
-        output = self.layers[i+1](input)
-        '''
         output = self.seq(input)
+        # x = F.relu(self.fc1(input))
+        # x = F.relu(self.fc2(x))
+        # x = F.relu(self.fc3(x))
+        # output = self.fc4(x)
         return output
 
 
 class DuellingDQN(nn.Module):
     #ref: https://towardsdatascience.com/how-to-implement-prioritized-experience-replay-for-a-deep-q-network-a710beecd77b
-    def __init__(self,sizeof_obs_space=2, sizeof_act_space=4,sizeof_hidden=256):
+    def __init__(self,sizeof_obs_space=2, sizeof_act_space=4,sizeof_hidden=256,
+                 number_of_common=2,number_of_value = 2,number_of_advantage=2, device=None):
         super().__init__()
         self.sizeof_obs_space = sizeof_obs_space
         self.sizeof_act_space = sizeof_act_space
@@ -92,23 +87,79 @@ class DuellingDQN(nn.Module):
         #Our DQN contains two additional layers, one for the value and the other the advantage
         #ref: https://arxiv.org/pdf/1511.06581.pdf
         self.common_stream = nn.Sequential(
-            nn.Linear(self.sizeof_obs_space,self.sizeof_hidden),
-            nn.ReLU(),
-            nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
-            nn.ReLU()
-        )
+            nn.Linear(self.sizeof_obs_space, self.sizeof_hidden),
+            nn.ReLU())
 
-        self.value_stream = nn.Sequential(
-            nn.Linear(self.sizeof_hidden,self.sizeof_hidden),
-            nn.ReLU(),
-            nn.Linear(self.sizeof_hidden, 1)
-        )
+        for i in range(0, number_of_common-1):
+            self.common_stream.append(module=nn.Linear(self.sizeof_hidden, self.sizeof_hidden))
+            self.common_stream.append(nn.ReLU())
 
-        self.advantage_stream = nn.Sequential(
-            nn.Linear(self.sizeof_hidden,self.sizeof_hidden),
-            nn.ReLU(),
-            nn.Linear(self.sizeof_hidden, self.sizeof_act_space)
-        )
+
+        # self.common_stream = nn.Sequential(
+        #     nn.Linear(self.sizeof_obs_space,self.sizeof_hidden),
+        #     nn.ReLU(),
+        #     nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
+        #     nn.ReLU()
+        # )
+
+        # self.value_stream = nn.Sequential(
+        #     nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
+        #     nn.ReLU())
+
+        for i in range(0, number_of_value):
+            if i==0:
+                #Add the first layer
+                self.value_stream = nn.Sequential(
+                    nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
+                    nn.ReLU())
+            elif i==number_of_value-1:
+                #Add the last layer
+                self.value_stream.append(nn.Linear(self.sizeof_hidden, 1))
+            else:
+                #Add all other layers
+                self.value_stream.append(module=nn.Linear(self.sizeof_hidden, self.sizeof_hidden))
+                self.value_stream.append(nn.ReLU())
+
+        # self.value_stream = nn.Sequential(
+        #     nn.Linear(self.sizeof_hidden,self.sizeof_hidden),
+        #     nn.ReLU(),
+        #     nn.Linear(self.sizeof_hidden, 1)
+        # )
+
+        # self.advantage_stream = nn.Sequential(
+        #     nn.Linear(self.sizeof_hidden,self.sizeof_hidden),
+        #     nn.ReLU(),
+        #     nn.Linear(self.sizeof_hidden, self.sizeof_act_space)
+        # )
+
+        for i in range(0, number_of_advantage):
+            if i == 0:
+                # Add the first layer
+                self.advantage_stream = nn.Sequential(
+                    nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
+                    nn.ReLU())
+            elif i == number_of_value - 1:
+                # Add the last layer
+                self.advantage_stream.append(nn.Linear(self.sizeof_hidden, 1))
+            else:
+                # Add all other layers
+                self.advantage_stream.append(module=nn.Linear(self.sizeof_hidden, self.sizeof_hidden))
+                self.advantage_stream.append(nn.ReLU())
+
+        self.common_stream.to(device=device)
+        self.value_stream.to(device=device)
+        self.advantage_stream.to(device=device)
+        # ref https://www.geeksforgeeks.org/initialize-weights-in-pytorch/
+        # ref: https://github.com/pytorch/examples/blob/main/dcgan/main.py#L95
+        for mod in self.common_stream:
+            if mod.__class__.__name__ == "Linear":
+                torch.nn.init.normal_(mod.weight, mean=0, std=1)
+        for mod in self.value_stream:
+            if mod.__class__.__name__ == "Linear":
+                torch.nn.init.normal_(mod.weight, mean=0, std=1)
+        for mod in self.advantage_stream:
+            if mod.__class__.__name__ == "Linear":
+                torch.nn.init.normal_(mod.weight, mean=0, std=1)
 
     def forward(self, input):
         # Run the forward pass. ref: INM707 Lab 8
@@ -148,21 +199,22 @@ class ReplayBuffer:
 
 class ClassicDQNAgent():
 
-    def __init__(self, env, epsilon=0.9, gamma=0.99, epsilon_decay=0.99,learning_rate=1e-05,buffer_size=50, batch_size = 5, target_update_interval = 5, loss_type ="MSE", device=None,
-                 duelling=False):
-        self.epsilon = epsilon
-        self.gamma = gamma
-        self.epsilon_decay = epsilon_decay
-        self.buffer_size = buffer_size
-        self.batch_size = batch_size
-        self.loss_function = LossFunction(loss_type)
+    def __init__(self, env, **kwargs):
+        self.epsilon = kwargs["epsilon"]
+        self.gamma = kwargs["gamma"]
+        self.epsilon_decay = kwargs["epsilon_decay"]
+        self.buffer_size = kwargs["buffer_size"]
+        self.batch_size = kwargs["batch_size"]
+        self.loss_function = LossFunction(kwargs["loss_type"])
         self.env = env
-        self.target_update_interval = target_update_interval
+        self.target_update_interval = kwargs["target_update_interval"]
+        self.seed = kwargs["seed"]
+        self.duelling = kwargs["duelling"]
+        self.learning_rate = kwargs["learning_rate"]
+        self.parameters = kwargs
 
-        if device is None:
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            self.device = device
+        random.seed(self.seed)
+        np.random.seed(self.seed)
 
         # Let's get the observation. ref: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
         #ref https://pytorch.org/tutorials/beginner/basics/transforms_tutorial.html
@@ -170,14 +222,20 @@ class ClassicDQNAgent():
         self.action_transforms = lambda action: action/self.env.action_space.n.item()
         self.replay_buffer = ReplayBuffer(self.buffer_size, self.batch_size,self.state_transforms,self.action_transforms)
 
-        if duelling==True:
-            self.P_network = DuellingDQN()
-            self.T_network = DuellingDQN()
+        if self.duelling==True:
+            self.P_network = DuellingDQN(device=device,
+                                         number_of_common=kwargs["number_of_common"],
+                                         number_of_value=kwargs["number_of_value"],
+                                         number_of_advantage=kwargs["number_of_advantage"])
+            self.T_network = DuellingDQN(device=device,
+                                         number_of_common=kwargs["number_of_common"],
+                                         number_of_value=kwargs["number_of_value"],
+                                         number_of_advantage=kwargs["number_of_advantage"])
         else:
-            self.P_network = DQN()
-            self.T_network = DQN()
+            self.P_network = DQN(device=device,sizeof_hidden=kwargs["sizeof_hidden"])
+            self.T_network = DQN(device=device,sizeof_hidden=kwargs["sizeof_hidden"])
 
-        self.optimizer = optim.AdamW(self.P_network.parameters(), lr=learning_rate)
+        self.optimizer = optim.AdamW(self.P_network.parameters(), lr=self.learning_rate)
 
         self.T_network.load_state_dict(self.P_network.state_dict())
 
@@ -199,18 +257,28 @@ class ClassicDQNAgent():
 
         return next_action.item()
 
-    def train(self,episode_count=100):
+    def train(self,experiment_id, episodes=100,seed=45):
 
+        self.seed = seed
         #Reset and render our environment
-        self.env.reset()
-        self.env.render()
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+        #ref: https://pytorch.org/docs/stable/notes/randomness.html
+        torch.manual_seed(self.seed)
 
-        episode_logger = []
+        episode_results = []
         #Training loop
-        for episode in range(episode_count):
+        for episode in range(episodes):
             #ref: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
             # reset the environment and get the observation
-            observation, info = self.env.reset()
+            # We increment the seed so that we can re-produce our results
+            # but our experiments will still be different
+            self.seed += 1
+            random.seed(self.seed)
+            np.random.seed(self.seed)
+            #self.env.render()
+
+            observation, info = self.env.reset(seed=self.seed)
             go = True
             episode_reward = 0
             steps_taken = 0
@@ -250,16 +318,18 @@ class ClassicDQNAgent():
                 go = not terminated
 
             #Get the results
-            episode_logger.append({"episode":episode,"episode_reward":episode_reward,"steps_taken":steps_taken, "topography": info["topography"]})
-            print("Episode",episode,"Reward",episode_reward, "Epsilon", self.epsilon, episode_reward,"Steps Taken",steps_taken,"Topography", info["topography"])
+            episode_results.append({"experiment_id": experiment_id, "parameters": self.parameters, "episode":episode,"episode_reward":episode_reward,"steps_taken":steps_taken, "topography": info["topography"]})
+            print("Episode",episode,"Reward",episode_reward, "Epsilon", self.epsilon, "Steps Taken",steps_taken,"Topography", info["topography"])
+
             #Update the weights for the target network after every episode
             if episode%self.target_update_interval==0:
                 self.T_network.load_state_dict(self.P_network.state_dict())
 
             #Update epsilon at the end of every episode
             self.epsilon *= self.epsilon_decay
+
         print("Learning complete")
-        return episode_logger
+        return episode_results
 
     def optimize_policy(self):
         batch = next(iter(self.replay_buffer))
@@ -286,6 +356,7 @@ class ClassicDQNAgent():
         with torch.no_grad():
             results = self.T_network(non_termination_next_states)
         next_state_action_value[non_terminating_mask] = results.max(1)[0]
+
         # Calculate the expected state action values
         expected_state_action_values = (next_state_action_value * self.gamma) + rewards
 
@@ -295,11 +366,10 @@ class ClassicDQNAgent():
         self.optimizer.step()
 
 
-
 class DoubleDQNAgent(ClassicDQNAgent):
     #ref: https://www.datahubbs.com/double-deep-q-learning-to-get-the-most-out-of-your-dqn/
-    def __init__(self, env, epsilon=0.5, gamma=0.99, epsilon_decay=1e-06, learning_rate=1e-05,buffer_size=50, batch_size = 5, target_update_interval = 5, loss_type ="MSE", device=None,duelling=False):
-        super().__init__(env, epsilon, gamma, epsilon_decay, learning_rate, buffer_size, batch_size, target_update_interval, loss_type, device,duelling)
+    def __init__(self, env, **kwargs):
+        super().__init__(env=env, **kwargs)
 
     def optimize_policy(self, episode_count=100):
 
@@ -339,36 +409,7 @@ class DoubleDQNAgent(ClassicDQNAgent):
         loss.backward()
         self.optimizer.step()
 
-gc.collect()
-env = JungleEnv(7)
-kwargs = {}
-dqnagent = DoubleDQNAgent(env,buffer_size=5000,batch_size=500,
-                           learning_rate=1e-02,
-                           gamma=1,
-                           target_update_interval=10,
-                           epsilon=0.9,epsilon_decay=0.99,
-                           loss_type=LossFunction.MSE,
-                           duelling=False)
-results = dqnagent.train(episode_count=50)
 
-
-rewards = np.array([[res["episode"], res["episode_reward"],0] for res in results])
-steps_in_episode = np.array([[res["episode"], res["steps_taken"],0] for res in results])
-ending_topography = np.array([[res["episode"], res["topography"],0] for res in results])
-
-for i in range(len(results)):
-    rewards[i][2] = sum(rewards[0:i + 1, [1]]) / (i + 1)  # calculate the average cumulative reward
-    steps_in_episode[i][2] = sum(steps_in_episode[0:i + 1, [1]]) / (i + 1)  # calculate the average cumulative reward
-
-plt.figure(1)
-plt.plot(rewards[:, [0]], rewards[:, [2]], label="Average cumulative Reward")
-plt.legend()
-plt.show()
-
-plt.figure(2)
-plt.plot(steps_in_episode[:, [0]], steps_in_episode[:, [2]], label="Average Steps Taken")
-plt.legend()
-plt.show()
 
 
 

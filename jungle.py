@@ -38,12 +38,11 @@ class Jungle:
         self.termination_topography = ["S","E"]
 
         self.jungle_floor = np.full([self.rows,self.cols,],'_')
-        #Our reward matrix consists of s rows and a columns where
-        #s: rows*cols which is the number of states. A state corresponds to the position on the jungle floow
-        #a: number of actions which in this case are 4
-        self.reward_matrix = np.full([self.rows*self.cols, len(self.all_actions)],np.nan)
 
-        #These variables change state as the agent moves
+        # Our reward shape consists of s rows and a columns where
+        # s: rows*cols which is the number of states. A state corresponds to the position on the jungle floow
+        # a: number of actions which in this case are 4
+        self.reward_shape = (self.rows * self.cols, len(self.all_actions))
 
         #Agent position: randomly assign a start position
         self.agent_position = [random.randint(1, self.rows), random.randint(1, self.cols)]
@@ -66,6 +65,7 @@ class Jungle:
     def build_jungle(self,seed):
         random.seed(seed)
         np.random.seed(seed)
+
         #Let's create a random jungle.
         position_indices = list(range(0,(self.rows*self.cols)))
         available_positions = [self.index_to_position(i) for i in position_indices]
@@ -88,27 +88,6 @@ class Jungle:
         for location in blocked_locations:
             self.blocked_locations.append(location)
             self.jungle_floor[location[0]-1, location[1]-1] = "X"
-
-    def fill_r_matrix(self):
-        #We build the r matrix based on the jungle floor
-        #Go through the rows
-        #Go through each column in the row and set the available moves and reward
-
-        for row in range(1,self.rows+1):
-            for col in range(1,self.cols+1):
-                #Get the list of available moves and get the reward based on that move
-                #print((row,col))
-                moves = self.get_available_moves((row,col))
-                for move in moves:
-                    if move=="North":
-                        self.reward_matrix[self.get_r_index((row,col)),self.all_actions["North"]] = self.get_reward((row-1,col))
-                    elif move=="South":
-                        self.reward_matrix[self.get_r_index((row,col)),self.all_actions["South"]] = self.get_reward((row+1,col))
-                    elif move == "East":
-                        self.reward_matrix[self.get_r_index((row,col)),self.all_actions["East"]] = self.get_reward((row,col+1))
-                    else:
-                        self.reward_matrix[self.get_r_index((row,col)), self.all_actions["West"]] = self.get_reward((row,col-1))
-        return
 
     def get_reward(self,position):
         topography = self.jungle_floor[position[0]-1,position[1]-1]

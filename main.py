@@ -43,7 +43,7 @@ jungle.add_topography([(7, 1, "$")])
 jungle.add_topography([(7, 3, "S")])
 jungle.add_topography([(7, 4, "E")])
 jungle.add_topography([(6, 1, "T")])
-jungle.fill_r_matrix()
+#jungle.fill_r_matrix()
 
 print(jungle.jungle_floor)
 
@@ -88,11 +88,12 @@ for params in parameters:
 
 plt.figure(1)
 plt.legend()
+plt.show()
 
 plt.figure(2)
 plt.legend()
+plt.show()
 
 plt.figure(3)
 plt.legend()
-
 plt.show()
