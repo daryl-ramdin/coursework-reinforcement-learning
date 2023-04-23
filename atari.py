@@ -26,6 +26,12 @@ config.replay_buffer_config["capacity"] = 5000
 config.double_q = True
 if torch.cuda.is_available(): config = config.resources(num_gpus = 2)
 config.replay_buffer_config["prioritized_replay"] = False
+config.replay_buffer_config["capacity"] = tune.grid_search([2500])
+
+analysis =tune.run("DQN",config=config.to_dict())
+
+
+
 algo = config.build()
 
 result = {}
