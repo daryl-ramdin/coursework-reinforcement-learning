@@ -59,32 +59,14 @@ class DQN(nn.Module):
             if mod.__class__.__name__ == "Linear":
                 torch.nn.init.normal_(mod.weight, mean=0, std=1)
 
-        # self.fc1 = nn.Linear(sizeof_obs_space, sizeof_hidden,device=device)
-        # self.fc2 = nn.Linear(sizeof_hidden, sizeof_hidden,device=device)
-        # self.fc3 = nn.Linear(sizeof_hidden, sizeof_hidden,device=device)
-        # self.fc4 = nn.Linear(sizeof_hidden, sizeof_act_space,device=device)
-        #
-        # torch.nn.init.normal_(self.fc1.weight, mean=0, std=1)
-        # torch.nn.init.normal_(self.fc2.weight, mean=0, std=1)
-        # torch.nn.init.normal_(self.fc3.weight, mean=0, std=1)
-        # torch.nn.init.normal_(self.fc4.weight, mean=0, std=1)
-
-
-
-
-
     def forward(self,input):
         #Run the forward pass. ref: INM707 Lab 8
         output = self.seq(input)
-        # x = F.relu(self.fc1(input))
-        # x = F.relu(self.fc2(x))
-        # x = F.relu(self.fc3(x))
-        # output = self.fc4(x)
         return output
 
 
 class DuellingDQN(nn.Module):
-    #ref: https://towardsdatascience.com/how-to-implement-prioritized-experience-replay-for-a-deep-q-network-a710beecd77b
+    #The code for this class inspired by: https://towardsdatascience.com/dueling-deep-q-networks-81ffab672751
     def __init__(self,sizeof_obs_space=2, sizeof_act_space=4,sizeof_hidden=256,
                  number_of_common=2,number_of_value = 2,number_of_advantage=2, device=None):
         super().__init__()
@@ -95,7 +77,6 @@ class DuellingDQN(nn.Module):
         self.mode = "mean"
 
         #Our DQN contains two additional layers, one for the value and the other the advantage
-        #ref: https://arxiv.org/pdf/1511.06581.pdf
         self.common_stream = nn.Sequential(
             nn.Linear(self.sizeof_obs_space, self.sizeof_hidden),
             nn.ReLU())
@@ -103,18 +84,6 @@ class DuellingDQN(nn.Module):
         for i in range(0, number_of_common-1):
             self.common_stream.append(module=nn.Linear(self.sizeof_hidden, self.sizeof_hidden))
             self.common_stream.append(nn.ReLU())
-
-
-        # self.common_stream = nn.Sequential(
-        #     nn.Linear(self.sizeof_obs_space,self.sizeof_hidden),
-        #     nn.ReLU(),
-        #     nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
-        #     nn.ReLU()
-        # )
-
-        # self.value_stream = nn.Sequential(
-        #     nn.Linear(self.sizeof_hidden, self.sizeof_hidden),
-        #     nn.ReLU())
 
         for i in range(0, number_of_value):
             if i == 0:
@@ -129,18 +98,6 @@ class DuellingDQN(nn.Module):
                 #Add all other layers
                 self.value_stream.append(module=nn.Linear(self.sizeof_hidden, self.sizeof_hidden))
                 self.value_stream.append(nn.ReLU())
-
-        # self.value_stream = nn.Sequential(
-        #     nn.Linear(self.sizeof_hidden,self.sizeof_hidden),
-        #     nn.ReLU(),
-        #     nn.Linear(self.sizeof_hidden, 1)
-        # )
-
-        # self.advantage_stream = nn.Sequential(
-        #     nn.Linear(self.sizeof_hidden,self.sizeof_hidden),
-        #     nn.ReLU(),
-        #     nn.Linear(self.sizeof_hidden, self.sizeof_act_space)
-        # )
 
         for i in range(0, number_of_advantage):
             if i == 0:
@@ -159,6 +116,8 @@ class DuellingDQN(nn.Module):
         self.common_stream.to(device=device)
         self.value_stream.to(device=device)
         self.advantage_stream.to(device=device)
+
+        #Initialise the weights
         # ref https://www.geeksforgeeks.org/initialize-weights-in-pytorch/
         # ref: https://github.com/pytorch/examples/blob/main/dcgan/main.py#L95
         for mod in self.common_stream:
@@ -172,7 +131,8 @@ class DuellingDQN(nn.Module):
                 torch.nn.init.normal_(mod.weight, mean=0, std=1)
 
     def forward(self, input):
-        # Run the forward pass. ref: INM707 Lab 8
+        # REF: https://towardsdatascience.com/dueling-deep-q-networks-81ffab672751
+        # Run the forward pass. REF: INM707 Lab 8
         common_value = self.common_stream(input)
         state_value = self.value_stream(common_value)
         advantage = self.advantage_stream(common_value)
@@ -208,7 +168,7 @@ class ReplayBuffer:
 
 
 class ClassicDQNAgent():
-
+    #Code for this class inspired by ref: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
     def __init__(self, env, **kwargs):
         self.epsilon = kwargs["epsilon"]
         self.gamma = kwargs["gamma"]
@@ -311,7 +271,7 @@ class ClassicDQNAgent():
                 if info["topography"] == "$":
                     treasure_counter += 1
 
-                # INM 707 Lab 8
+                # REF: INM 707 Lab 8
                 if terminated:
                     next_state = None
                 else:
@@ -347,6 +307,7 @@ class ClassicDQNAgent():
         return episode_results
 
     def optimize_policy(self):
+        # ref: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
         batch = next(iter(self.replay_buffer))
         # We now have a batch of transitions on which we will train our networks
         i = 1
@@ -382,7 +343,8 @@ class ClassicDQNAgent():
 
 
 class DoubleDQNAgent(ClassicDQNAgent):
-    #ref: https://www.datahubbs.com/double-deep-q-learning-to-get-the-most-out-of-your-dqn/
+    #Code for this class inspired by ref: https://www.datahubbs.com/double-deep-q-learning-to-get-the-most-out-of-your-dqn/
+    # and https://github.com/Parsa33033/Deep-Reinforcement-Learning-DQN/blob/master/Double-DQN.py
     def __init__(self, env, **kwargs):
         super().__init__(env=env, **kwargs)
 
@@ -419,7 +381,6 @@ class DoubleDQNAgent(ClassicDQNAgent):
         expected_state_action_values = (next_state_action_value * self.gamma) + rewards
 
         loss = self.loss_function.calculate(state_action_values.squeeze(1), expected_state_action_values)
-        # loss =  criterion(state_action_value.unsqueeze(0).unsqueeze(1),expected_state_action_values.unsqueeze(0).unsqueeze(1))
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()

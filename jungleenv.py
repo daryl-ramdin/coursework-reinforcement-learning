@@ -8,7 +8,7 @@ import numpy as np
 
 
 class JungleEnv(gym.Env):
-
+    #Code inspired by ref: https://github.com/openai/gym/blob/master/gym/envs/classic_control/mountain_car.py
     def __init__(self, size, seed=45):
         self.size = size
 

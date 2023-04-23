@@ -7,16 +7,14 @@ import numpy as np
 class Jungle:
 
     def __init__(self, rows, cols, revisits=True, vanishing_treasure=False, seed=45):
+        #Code for this class inspired by INM707 Lab 4 and Lab 6 and
+        #https://github.com/openai/gym/blob/master/gym/envs/classic_control/mountain_car.py
         self.rows = rows
         self.cols = cols
         self.revisits = revisits
         self.vanishing_treasure = vanishing_treasure
         self.all_actions = {"North":0,"South":1,"East":2,"West":3}
         self.penalty = -5   #The penalty for making an illegal move
-
-        #Ref INM707 Lab 6
-        #self.blocked_locations = []
-        #self.agent_position = None
 
         self.seed = seed
         random.seed(self.seed)

@@ -17,6 +17,7 @@ class LearningBy:
 
 
 class HikerAgent:
+    #Code for this class inspired by INM707 Lab 4 and Lab8
     def __init__(self, jungle: Jungle, sarsa=False, seed=45):
         self.environment = jungle
         self.initialise_q_matrix()
@@ -142,6 +143,7 @@ class HikerAgent:
         return self.q_matrix[self.environment.get_r_index((state[0],state[1])), action_index]
 
     def q_learn(self, reward, state, next_state, action, available_moves):
+        #ref: INM707 Lab 4
         #We will update the Q value for the given state and action
         #For Q Learning we do not use the available moves
 
